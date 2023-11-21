@@ -36,7 +36,6 @@ namespace LCSoundDebug.Patches
                 Plugin.Instance.logger.LogDebug($"{__instance} at {__instance.transform.root}  is playing  {__instance.clip.name}");
         }
         [HarmonyPatch(nameof(AudioSource.PlayClipAtPoint), new[] { typeof(AudioClip), typeof(Vector3), typeof(float) })]
-        [HarmonyPrefix]
         public static void LogPlayingClipAtPointAudio2(AudioSource ___audioSource)
         {
             if (Plugin.debugAudioSources)
