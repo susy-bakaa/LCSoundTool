@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33627.172
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LCSoundDebug", "LCSoundDebug.csproj", "{4D9424B3-38B5-423C-AEA1-11675B012916}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4D9424B3-38B5-423C-AEA1-11675B012916}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D9424B3-38B5-423C-AEA1-11675B012916}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D9424B3-38B5-423C-AEA1-11675B012916}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D9424B3-38B5-423C-AEA1-11675B012916}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C24A0A3C-6E93-4F73-BEDC-199B7CE11FCC}
+	EndGlobalSection
+EndGlobal

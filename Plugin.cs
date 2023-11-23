@@ -26,26 +26,82 @@ namespace LCSoundDebug
 
         public static bool debugAudioSources;
 
+        private GameObject soundDebugGameObject;
+
         private void Awake()
         {
             if (Instance == null)
             {
                 Instance = this;
+
+                logger = BepInEx.Logging.Logger.CreateLogSource(PLUGIN_GUID);
+
+                logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
+
+                toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
+
+                debugAudioSources = false;
+
+                harmony.PatchAll(typeof(AudioSourcePatch));
+                //harmony.PatchAll(typeof(Plugin));
             }
-
-            logger = BepInEx.Logging.Logger.CreateLogSource(PLUGIN_GUID);
-
-            logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
-
-            toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
-
-            debugAudioSources = false;
-
-            harmony.PatchAll(typeof(Plugin));
-			harmony.PatchAll(typeof(AudioSourcePatch));
         }
 
-        [HarmonyPatch(typeof(PlayerControllerB), "Update")]
+        private void Update()
+        {
+            if (soundDebugGameObject == null)
+            {
+                GameObject previous = GameObject.Find("SoundDebug");
+
+                if (previous != null)
+                {
+                    UnityEngine.Object.Destroy(previous);
+                }
+
+                soundDebugGameObject = new GameObject("SoundDebug");
+                SoundDebug soundDebug = soundDebugGameObject.AddComponent<SoundDebug>();
+                soundDebug.source = this;
+
+                if (Instance != null && Instance != this)
+                {
+                    UnityEngine.Object.Destroy(Instance);
+                    Instance = this;
+                }
+                else if (Instance == null)
+                {
+                    Instance = this;
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (soundDebugGameObject == null)
+            {
+                GameObject previous = GameObject.Find("SoundDebug");
+
+                if (previous != null)
+                {
+                    UnityEngine.Object.Destroy(previous);
+                }
+
+                soundDebugGameObject = new GameObject("SoundDebug");
+                SoundDebug soundDebug = soundDebugGameObject.AddComponent<SoundDebug>();
+                soundDebug.source = this;
+
+                if (Instance != null && Instance != this)
+                {
+                    UnityEngine.Object.Destroy(Instance);
+                    Instance = this;
+                }
+                else if (Instance == null)
+                {
+                    Instance = this;
+                }
+            }
+        }
+
+        /*[HarmonyPatch(typeof(PlayerControllerB), "Update")]
         [HarmonyPrefix]
         public static void HookPlayerControllerBUpdate()
         {
@@ -58,6 +114,6 @@ namespace LCSoundDebug
                 wasKeyDown = false;
                 debugAudioSources = !debugAudioSources;
                 Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");            }
-        }
+        }*/
     }
 }
