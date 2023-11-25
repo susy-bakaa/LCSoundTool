@@ -19,7 +19,7 @@ namespace LCSoundTool
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        private const string PLUGIN_VERSION = "1.1.0";
+        private const string PLUGIN_VERSION = "1.2.0";
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 

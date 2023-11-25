@@ -1,6 +1,9 @@
 # LC Sound Tool
 Simple Lethal Company sound tool and debugger. Patches all native Unity AudioSource components allowing you to dynamically replace (almost) any sound in the game at the final stages of playback by just specifying a new audio clip and the original clips name to this mod. Let's you easily load your own custom .wav sound files for your own mods and optionally allows logging all AudioSources playback, including PlayOneShot, PlayClipAtPoint etc. and the names of each clip playing into the BepInEx console when you press the F5 key. More in depth logging can be toggled with LeftAlt + F5.
 
+## ATTENTION
+This mod won't work without a mod of your own that does the replacing. This mod is just purely a tool/API for replacing and loading sound files from the game folder. For replacing without a mod of your own you can try the following seperate mod utilizing this tool: https://thunderstore.io/c/lethal-company/p/Clementinise/CustomSounds/
+
 ## Features
 
 - Press F5 to log all audio playback to BepInEx console.
