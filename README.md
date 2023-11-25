@@ -41,6 +41,7 @@ Make sure you have the following BepInEx.cfg settings:
 - [Logging.Console] Enabled = true
 - [Logging.Console] LogLevels = Fatal, Error, Info, Debug
 - Possibly [Logging.Disk] WriteUnityLog = false
+
 If they're still not showing up just shoot me a msg in Discord (@no00ob) and we can try to figure it out.
 
 #### Can you use this tool to record sounds or interact with the voice chat?
