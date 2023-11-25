@@ -9,7 +9,7 @@ Simple Lethal Company sound tool and debugger. Patches all native Unity AudioSou
 
 ## Installation
 
-Install like any other BepInEx mod. You can get a built version of the mod from the github releases page. Install to the following directory:
+Install like any other BepInEx mod. Install to the following directory:
 
 ```
   \GAME_LOCATION\Lethal Company\BepInEx\plugins
@@ -31,12 +31,21 @@ using LCSoundTool;
 
 SoundTool.RestoreAudioClip("GhostDevicePing"); // GhostDevicePing is the name of the sound we replaced and in this case the radar ping sound which we now restore back to default
 ```
-For more in-depth example see the following repo: https://github.com/no00ob/CustomPingSound
+For more in-depth example see the following github repo: https://github.com/no00ob/CustomPingSound
 ## FAQ
 
-#### Can you use this tool to record or otherwise interact with the voice chat?
+#### Why are none of the logs showing up?
 
-No. This tool is strictly for native Unity AudioSource components.
+Make sure you have the following BepInEx.cfg settings:
+- [Chainloader] HideManagerGameObject = true
+- [Logging.Console] Enabled = true
+- [Logging.Console] LogLevels = Fatal, Error, Info, Debug
+- Possibly [Logging.Disk] WriteUnityLog = false
+If they're still not showing up just shoot me a msg in Discord (@no00ob) and we can try to figure it out.
+
+#### Can you use this tool to record sounds or interact with the voice chat?
+
+No, not at the moment. I might look into this later.
 
 #### What is the performance impact of this tool compared to just manual replacement?
 
