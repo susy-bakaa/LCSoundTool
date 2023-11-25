@@ -63,3 +63,7 @@ Surprisingly it should work actually. I tried it with my Unity 2022.3.x game and
 #### Can I contribute somehow?
 
 Yes. If you find any bugs or errors let me know and feel free to send pull requests my way if you feel like you can provide better programming or more features.
+
+## Known Issues
+
+- Sometimes some AudioSources escape the logging. It seems to be mostly once that are either already playing before logging with loop set to true (intended behaviour) or ones that have playOnAwake set to true
