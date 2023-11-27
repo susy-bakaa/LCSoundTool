@@ -27,31 +27,49 @@ using LCSoundTool;
 
 AudioClip newSound;
 
-newSound = SoundTool.GetAudioClip("YourModDirectory", "ping.wav"); // 'ping.wav' is the name of the .wav sound file and 'YourModDirectory' is the name of the folder inside the plugin folder where the mod will try to load the sound file.
+// 'test.wav' is the name of the .wav sound file you're going to load 
+// 'YourModDirectory' is the name of your mods installation folder which mod managers create
+// This is usually the format of 'Author-ModName', if you're unsure check how your mod manager installs mods
+// As an example, this mod is installed as 'no00ob-LCSoundTool'
+// This is because the author on this website is listed as me 'no00ob' and my mod is called 'LCSoundTool' here
+// 'SubFolder' is the OPTIONAL folder inside the 'YourModDirectory' folder where the mod will try to load the sound files from
+// You can also leave this blank and it will just load them from the root where your mod's DLL file is also located.
+
+newSound = SoundTool.GetAudioClip("YourModDirectory", "SubFolder", "test.wav");
 ```
 Adding a replacement sound:
 ```csharp
 using LCSoundTool;
 
-AudioClip newSound; // your logic for the new sound
+// Your own logic for the new sound
+// This could be what is shown above or you could load it from an AssetBundle
 
-SoundTool.ReplaceAudioClip("GhostDevicePing", newSound); // GhostDevicePing is the name of the original sound in this case the radar ping sound
+AudioClip newSound;
+
+// GhostDevicePing is the name of the original sound
+// In this case it is the radar ping sound
+
+SoundTool.ReplaceAudioClip("GhostDevicePing", newSound); 
 ```
 Removing a replacement sound:
 ```csharp
 using LCSoundTool;
 
-SoundTool.RestoreAudioClip("GhostDevicePing"); // GhostDevicePing is the name of the sound we replaced and in this case the radar ping sound which we now restore back to default
+// GhostDevicePing is the name of the sound we replaced 
+// In this case it is the radar ping sound
+// Which we now restore back to the default vanilla sound
+
+SoundTool.RestoreAudioClip("GhostDevicePing");
 ```
 For more in-depth example see the following github repo: https://github.com/no00ob/CustomPingSound
 ## FAQ
 
 #### Why are none of the logs showing up?
 
-Make sure you have the following BepInEx.cfg settings:
+Make sure you have at least the following BepInEx.cfg settings:
 - [Chainloader] HideManagerGameObject = true
 - [Logging.Console] Enabled = true
-- [Logging.Console] LogLevels = Fatal, Error, Info, Debug
+- [Logging.Console] LogLevels = Fatal, Error, Info, Debug, Warning
 - Possibly [Logging.Disk] WriteUnityLog = false
 
 If they're still not showing up just shoot me a msg in Discord (@no00ob) and we can try to figure it out.

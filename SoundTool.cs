@@ -19,7 +19,7 @@ namespace LCSoundTool
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        private const string PLUGIN_VERSION = "1.2.0";
+        private const string PLUGIN_VERSION = "1.2.2";
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 
@@ -168,33 +168,81 @@ namespace LCSoundTool
             }
         }
 
-        public static AudioClip GetAudioClip(string folder, string soundName)
+        public static AudioClip GetAudioClip(string modFolder, string soundName)
+        {
+            return GetAudioClip(modFolder, string.Empty, soundName);
+        }
+
+        public static AudioClip GetAudioClip(string modFolder, string subFolder, string soundName)
         {
             bool tryLoading = true;
+            string legacy = " ";
 
             // path stuff
-            var path = Path.Combine(Environment.CurrentDirectory, "BepInEx", "plugins", folder, soundName);
-            var pathDir = Path.Combine(Environment.CurrentDirectory, "BepInEx", "plugins", folder);
+            var path = Path.Combine(Paths.PluginPath, modFolder, subFolder, soundName);
+            var pathOmitSubDir = Path.Combine(Paths.PluginPath, modFolder, soundName);
+            var pathDir = Path.Combine(Paths.PluginPath, modFolder, subFolder);
+
+            var pathLegacy = Path.Combine(Paths.PluginPath, subFolder, soundName);
+            var pathDirLegacy = Path.Combine(Paths.PluginPath, subFolder);
+
             // check if file and directory are valid, else skip loading
             if (!Directory.Exists(pathDir))
             {
-                Instance.logger.LogWarning($"Requested directory does not exist! Creating new one at path: {pathDir}");
-                Directory.CreateDirectory(pathDir);
+                if (!string.IsNullOrEmpty(subFolder))
+                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder}/{subFolder} does not exist!");
+                else
+                {
+                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder} does not exist!");
+                    if (!modFolder.Contains("-"))
+                        Instance.logger.LogWarning($"This sound mod might not be compatable with mod managers. You should contact the sound mod's author.");
+                }
+                //Directory.CreateDirectory(pathDir);
                 tryLoading = false;
             }
             if (!File.Exists(path))
             {
-                Instance.logger.LogWarning($"Requested audio file does not exist at path: {path}!");
+                Instance.logger.LogWarning($"Requested audio file does not exist at path {path}!");
                 tryLoading = false;
+
+                Instance.logger.LogDebug($"Looking for audio file from mod root instead at {pathOmitSubDir}...");
+                if (File.Exists(pathOmitSubDir))
+                {
+                    Instance.logger.LogDebug($"Found audio file at path {pathOmitSubDir}!");
+                    path = pathOmitSubDir;
+                    tryLoading = true;
+                }
+                else
+                {
+                    Instance.logger.LogWarning($"Requested audio file does not exist at mod root path {pathOmitSubDir}!");
+                }
+            }
+            if (Directory.Exists(pathDirLegacy))
+            {
+                if (!string.IsNullOrEmpty(subFolder))
+                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins/{subFolder} found!");
+                else if (!modFolder.Contains("-"))
+                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins found!");
+            }
+            if (File.Exists(pathLegacy))
+            {
+                Instance.logger.LogWarning($"Legacy path contains the requested audio file at path {pathLegacy}!");
+                legacy = " legacy ";
+                path = pathLegacy;
+                tryLoading = true;
             }
 
             AudioClip result = null;
 
             if (tryLoading)
             {
-                Instance.logger.LogDebug($"Loading AudioClip {soundName} from path: {path}");
+                Instance.logger.LogDebug($"Loading AudioClip {soundName} from{legacy}path: {path}");
                 result = LoadClip(path);
                 Instance.logger.LogDebug($"Finished loading AudioClip {soundName} with length of {result.length}!");
+            }
+            else
+            {
+                Instance.logger.LogWarning($"Failed to load AudioClip {soundName} from invalid{legacy}path at {path}!");
             }
 
             // return the clip we got

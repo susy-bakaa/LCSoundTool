@@ -4,7 +4,7 @@
         <TargetFramework>netstandard2.1</TargetFramework>
         <AssemblyName>LC_SoundTool</AssemblyName>
         <Description>Various audio related functions. Mainly logs all sounds that are playing and what type of playback they're into the BepInEx console.</Description>
-        <Version>1.2.0</Version>
+        <Version>1.2.2</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
