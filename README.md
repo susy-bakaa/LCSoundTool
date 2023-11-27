@@ -31,7 +31,7 @@ AudioClip newSound;
 // 'YourModDirectory' is the name of your mods installation folder which mod managers create
 // This is usually the format of 'Author-ModName', if you're unsure check how your mod manager installs mods
 // As an example, this mod is installed as 'no00ob-LCSoundTool'
-// This is because the author on this website is listed as me 'no00ob' and my mod is called 'LCSoundTool' here
+// This is because the author on thunderstore is listed as me 'no00ob' and my mod is called 'LCSoundTool' there
 // 'SubFolder' is the OPTIONAL folder inside the 'YourModDirectory' folder where the mod will try to load the sound files from
 // You can also leave this blank and it will just load them from the root where your mod's DLL file is also located.
 
