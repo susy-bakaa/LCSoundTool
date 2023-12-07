@@ -1,0 +1,5 @@
+xcopy /y $(TargetDir)$(TargetName).dll "F:\NetcodePatcher\plugins"
+cd "F:\NetcodePatcher\"
+NetcodePatcher.dll plugins\ deps\
+xcopy /y F:/NetcodePatcher/plugins/$(TargetName).dll "C:/Users/Aki/AppData/Roaming/r2modmanPlus-local/LethalCompany/profiles/Personal/BepInEx/plugins/no00ob-LCSoundTool"
+xcopy /y F:/NetcodePatcher/plugins/$(TargetName).dll "C:/Users/Aki/AppData/Roaming/r2modmanPlus-local/LethalCompany/profiles/SoundTest/BepInEx/plugins/no00ob-LCSoundTool"

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Reflection;
 using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
@@ -8,9 +10,15 @@ using BepInEx.Logging;
 using GameNetcodeStuff;
 using HarmonyLib;
 using JetBrains.Annotations;
-using LCSoundTool.Patches;
+using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Networking;
+using LCSoundTool.Patches;
+using LCSoundTool.Utilities;
+using LCSoundTool.Networking;
+using LCSoundTool.Resources;
+using LCSoundToolMod.Patches;
 
 namespace LCSoundTool
 {
@@ -19,7 +27,7 @@ namespace LCSoundTool
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        private const string PLUGIN_VERSION = "1.2.2";
+        private const string PLUGIN_VERSION = "1.3.0";
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 
@@ -35,10 +43,16 @@ namespace LCSoundTool
         public static bool debugAudioSources;
         public static bool indepthDebugging;
 
-        private GameObject soundToolGameObject;
-        public SoundToolUpdater updater { get; private set; }
+        //private GameObject soundToolGameObject;
+        //public SoundToolUpdater updater { get; private set; }
+
+        public static bool networkSetup { get; private set; }
 
         public static Dictionary<string, AudioClip> replacedClips { get; private set; }
+        public static Dictionary<string, AudioClip> networkedClips { get { return NetworkHandler.networkedAudioClips; } }
+
+        public static event Action ClientNetworkedAudioChanged { add { NetworkHandler.ClientNetworkedAudioChanged += value; } remove { NetworkHandler.ClientNetworkedAudioChanged -= value; } }
+        public static event Action HostNetworkedAudioChanged { add { NetworkHandler.HostNetworkedAudioChanged += value; } remove { NetworkHandler.HostNetworkedAudioChanged -= value; } }
 
         public static void ReplaceAudioClip(string originalName, AudioClip newClip)
         {
@@ -111,49 +125,124 @@ namespace LCSoundTool
             if (Instance == null)
             {
                 Instance = this;
-
-                logger = BepInEx.Logging.Logger.CreateLogSource(PLUGIN_GUID);
-
-                logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
-
-                toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
-                toggleIndepthDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftAlt });
-
-                debugAudioSources = false;
-                indepthDebugging = false;
-
-                replacedClips = new Dictionary<string, AudioClip>();
-
-                harmony.PatchAll(typeof(AudioSourcePatch));
-                harmony.PatchAll(typeof(NetworkSceneManagerPatch));
-
-                SoundToolUpdater();
             }
+
+            // NetcodePatcher stuff
+            var types = Assembly.GetExecutingAssembly().GetTypes();
+            foreach (var type in types)
+            {
+                var methods = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+                foreach (var method in methods)
+                {
+                    var attributes = method.GetCustomAttributes(typeof(RuntimeInitializeOnLoadMethodAttribute), false);
+                    if (attributes.Length > 0)
+                    {
+                        method.Invoke(null, null);
+                    }
+                }
+            }
+
+            logger = BepInEx.Logging.Logger.CreateLogSource(PLUGIN_GUID);
+
+            logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
+
+            logger.LogDebug("Loading SoundTool AssetBundle...");
+
+            // AssetBundle for NetworkHandler gameobject
+            Assets.bundle = AssetBundle.LoadFromMemory(LCSoundToolMod.Properties.Resources.soundtool);
+
+            if (Assets.bundle == null)
+            {
+                logger.LogError("Failed to load SoundTool AssetBundle!");
+            }
+            else
+            {
+                logger.LogDebug("Finished loading SoundTool AssetBundle!");
+            }
+
+            toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
+            toggleIndepthDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftAlt });
+
+            debugAudioSources = false;
+            indepthDebugging = false;
+
+            replacedClips = new Dictionary<string, AudioClip>();
+
+
+            harmony.PatchAll(typeof(AudioSourcePatch));
+            harmony.PatchAll(typeof(NetworkSceneManagerPatch));
+            harmony.PatchAll(typeof(GameNetworkManagerPatch));
+            harmony.PatchAll(typeof(StartOfRoundPatch));
         }
 
         private void Update()
         {
-            SoundToolUpdater();
+            if (!networkSetup)
+            {
+                if (NetworkHandler.Instance != null)
+                {
+                    networkSetup = true;
+                }
+            }
+            else
+            {
+                if (NetworkHandler.Instance == null)
+                {
+                    networkSetup = false;
+                }
+            }
+
+            if (toggleIndepthDebugLog.IsDown() && !wasKeyDown2)
+            {
+                wasKeyDown2 = true;
+                wasKeyDown = false;
+            }
+            if (toggleIndepthDebugLog.IsUp() && wasKeyDown2)
+            {
+                wasKeyDown2 = false;
+                wasKeyDown = false;
+                debugAudioSources = !debugAudioSources;
+                indepthDebugging = debugAudioSources;
+                Instance.logger.LogDebug($"Toggling in-depth AudioSource debug logs {debugAudioSources}!");
+                return;
+            }
+
+            if (!wasKeyDown2 && !toggleIndepthDebugLog.IsDown() && toggleAudioSourceDebugLog.IsDown() && !wasKeyDown)
+            {
+                wasKeyDown = true;
+                wasKeyDown2 = false;
+            }
+            if (toggleAudioSourceDebugLog.IsUp() && wasKeyDown)
+            {
+                wasKeyDown = false;
+                wasKeyDown2 = false;
+                debugAudioSources = !debugAudioSources;
+                Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");
+            }
+
+            //SoundToolMonobehaviours();
         }
 
-        private void OnDestroy()
-        {
-            SoundToolUpdater();
-        }
+        //private void OnDestroy()
+        //{
+        //   SoundToolMonobehaviours();
+        //}
 
-        private void SoundToolUpdater()
+        /*private void SoundToolMonobehaviours()
         {
             if (soundToolGameObject == null)
             {
-                GameObject previous = GameObject.Find("SoundToolUpdater");
+                GameObject previous = GameObject.Find("SoundToolObject");
 
                 if (previous != null)
                 {
                     UnityEngine.Object.Destroy(previous);
                 }
 
-                soundToolGameObject = new GameObject("SoundToolUpdater");
+                soundToolGameObject = new GameObject("SoundToolObject");
                 updater = soundToolGameObject.AddComponent<SoundToolUpdater>();
+                soundToolGameObject.AddComponent<NetworkObject>();
+
                 updater.originSoundTool = this;
 
                 if (Instance != null && Instance != this)
@@ -166,7 +255,7 @@ namespace LCSoundTool
                     Instance = this;
                 }
             }
-        }
+        }*/
 
         public static AudioClip GetAudioClip(string modFolder, string soundName)
         {
@@ -245,6 +334,8 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Failed to load AudioClip {soundName} from invalid{legacy}path at {path}!");
             }
 
+            result.name = soundName.Replace(".wav","");
+
             // return the clip we got
             return result;
         }
@@ -278,6 +369,61 @@ namespace LCSoundTool
             }
 
             return clip;
+        }
+
+        public AudioSource[] GetAllPlayOnAwakeAudioSources()
+        {
+            AudioSource[] sources = FindObjectsOfType<AudioSource>(true);
+            List<AudioSource> results = new List<AudioSource>();
+
+            for (int i = 0; i < sources.Length; i++)
+            {
+                if (sources[i].playOnAwake)
+                {
+                    results.Add(sources[i]);
+                }
+            }
+
+            return results.ToArray();
+        }
+
+        public static void SendNetworkedAudioClip(AudioClip audioClip)
+        {
+            if (audioClip == null)
+            {
+                Instance.logger.LogWarning($"audioClip variable of SendAudioClip not assigned! Failed to send {audioClip}!");
+                return;
+            }
+
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null)
+            {
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send {audioClip}! If you're sending things in Awake try some of the other built-in Unity methods!");
+                return;
+            }
+
+            NetworkHandler.Instance.SendAudioClipServerRpc(audioClip.GetName(), WavUtility.AudioClipToByteArray(audioClip, out float[] samples));
+        }
+
+        public static void RemoveNetworkedAudioClip(AudioClip audioClip)
+        {
+            RemoveNetworkedAudioClip(audioClip.GetName());
+        }
+
+        public static void RemoveNetworkedAudioClip(string audioClip)
+        {
+            if (string.IsNullOrEmpty(audioClip))
+            {
+                Instance.logger.LogWarning($"audioClip variable of RemoveAudioClip not assigned! Failed to remove {audioClip}!");
+                return;
+            }
+
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null)
+            {
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to remove {audioClip}! If you're removing things in Awake try some of the other built-in Unity methods!");
+                return;
+            }
+
+            NetworkHandler.Instance.RemoveAudioClipServerRpc(audioClip);
         }
     }
 }

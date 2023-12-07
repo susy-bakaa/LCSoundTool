@@ -11,20 +11,20 @@ namespace LCSoundTool.Patches
         [HarmonyPostfix]
         public static void OnSceneLoaded_Patch()
         {
-            if (SoundTool.Instance.updater == null)
+            if (SoundTool.Instance == null)
                 return;
 
             SoundTool.Instance.logger.LogDebug($"Grabbing all playOnAwake AudioSources...");
 
-            AudioSource[] sources = SoundTool.Instance.updater.GetAllPlayOnAwakeAudioSources();
+            AudioSource[] sources = SoundTool.Instance.GetAllPlayOnAwakeAudioSources();
 
             SoundTool.Instance.logger.LogDebug($"Found {sources.Length} playOnAwake AudioSources!");
-            SoundTool.Instance.logger.LogDebug($"Starting setup on {sources.Length - 3} compatable playOnAwake AudioSources...");
+            SoundTool.Instance.logger.LogDebug($"Starting setup on {sources.Length/* - 3*/} compatable playOnAwake AudioSources...");
 
             foreach (AudioSource s in sources)
             {
-                if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX"))
-                {
+                //if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX"))
+                //{
                     if (s.transform.TryGetComponent(out AudioSourceExtension sExt))
                     {
                         sExt.playOnAwake = true;
@@ -42,10 +42,10 @@ namespace LCSoundTool.Patches
                         s.playOnAwake = false;
                         SoundTool.Instance.logger.LogDebug($"-Add- {System.Array.IndexOf(sources, s) + 1} {s} done!");
                     }
-                }
+                //}
             }
 
-            SoundTool.Instance.logger.LogDebug($"Done setting up {sources.Length - 3} compatable playOnAwake AudioSources!");
+            SoundTool.Instance.logger.LogDebug($"Done setting up {sources.Length/* - 3*/} compatable playOnAwake AudioSources!");
         }
     }
 }
