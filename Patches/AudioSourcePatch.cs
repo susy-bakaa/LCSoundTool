@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace LCSoundTool.Patches
 {
@@ -175,7 +174,48 @@ namespace LCSoundTool.Patches
 
             string clipName = instance.clip.GetName();
 
+            // Check if clipName exists in the dictionary
             if (SoundTool.replacedClips.ContainsKey(clipName))
+            {
+                if (!originalClips.ContainsKey(clipName))
+                {
+                    originalClips.Add(clipName, instance.clip);
+                }
+
+                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[clipName];
+
+                // Calculate total chance
+                float totalChance = 0f;
+                foreach (RandomAudioClip rc in randomAudioClip)
+                {
+                    totalChance += rc.chance;
+                }
+
+                // Generate a random value between 0 and totalChance
+                float randomValue = UnityEngine.Random.Range(0f, totalChance);
+
+                // Choose the clip based on the random value and chances
+                foreach (RandomAudioClip rc in randomAudioClip)
+                {
+                    if (randomValue <= rc.chance)
+                    {
+                        // Use the chosen audio clip
+                        instance.clip = rc.clip;
+                        return;
+                    }
+
+                    // Subtract the chance of the current clip from randomValue
+                    randomValue -= rc.chance;
+                }
+            }
+            // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
+            else if (originalClips.ContainsKey(clipName))
+            {
+                instance.clip = originalClips[clipName];
+                originalClips.Remove(clipName);
+            }
+
+            /*if (SoundTool.replacedClips.ContainsKey(clipName))
             {
                 if (!originalClips.ContainsKey(clipName))
                 {
@@ -188,7 +228,7 @@ namespace LCSoundTool.Patches
             {
                 instance.clip = originalClips[clipName];
                 originalClips.Remove(clipName);
-            }
+            }*/
         }
 
         private static AudioClip ReplaceClipWithNew(AudioClip original)
@@ -197,7 +237,48 @@ namespace LCSoundTool.Patches
 
             string clipName = original.GetName();
 
+            // Check if clipName exists in the dictionary
             if (SoundTool.replacedClips.ContainsKey(clipName))
+            {
+                if (!originalClips.ContainsKey(clipName))
+                {
+                    originalClips.Add(clipName, original);
+                }
+
+                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[clipName];
+
+                // Calculate total chance
+                float totalChance = 0f;
+                foreach (RandomAudioClip rc in randomAudioClip)
+                {
+                    totalChance += rc.chance;
+                }
+
+                // Generate a random value between 0 and totalChance
+                float randomValue = UnityEngine.Random.Range(0f, totalChance);
+
+                // Choose the clip based on the random value and chances
+                foreach (RandomAudioClip rc in randomAudioClip)
+                {
+                    if (randomValue <= rc.chance)
+                    {
+                        // Return the chosen audio clip
+                        return rc.clip;
+                    }
+
+                    // Subtract the chance of the current clip from randomValue
+                    randomValue -= rc.chance;
+                }
+            }
+            // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
+            else if (originalClips.ContainsKey(clipName))
+            {
+                AudioClip temp = originalClips[clipName];
+                originalClips.Remove(clipName);
+                return temp;
+            }
+
+            /*if (SoundTool.replacedClips.ContainsKey(clipName))
             {
                 if (!originalClips.ContainsKey(clipName))
                 {
@@ -211,7 +292,7 @@ namespace LCSoundTool.Patches
                 AudioClip temp = originalClips[clipName];
                 originalClips.Remove(clipName);
                 return temp;
-            }
+            }*/
 
             return original;
         }

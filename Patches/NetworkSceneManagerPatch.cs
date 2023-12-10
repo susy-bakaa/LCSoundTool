@@ -2,6 +2,7 @@
 using Unity.Netcode;
 using UnityEngine;
 
+// Unused currently, replaced by the actual real way to do stuff when scene loads
 namespace LCSoundTool.Patches
 {
     [HarmonyPatch(typeof(NetworkSceneManager))]

@@ -7,7 +7,7 @@ using LCSoundTool.Patches;
 using Unity.Netcode;
 using UnityEngine;
 
-namespace LCSoundToolMod.Patches
+namespace LCSoundTool.Patches
 {
     [HarmonyPatch(typeof(StartOfRound))]
     internal class StartOfRoundPatch

@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System;
+using UnityEngine.Networking;
 
 namespace LCSoundTool.Utilities
 {
@@ -46,6 +47,37 @@ namespace LCSoundTool.Utilities
             }
 
             return floatArray;
+        }
+
+        public static AudioClip LoadFromDiskToAudioClip(string path)
+        {
+            AudioClip clip = null;
+            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.WAV))
+            {
+                uwr.SendWebRequest();
+
+                // we have to wrap tasks in try/catch, otherwise it will just fail silently
+                try
+                {
+                    while (!uwr.isDone)
+                    {
+
+                    }
+
+                    if (uwr.result != UnityWebRequest.Result.Success)
+                        SoundTool.Instance.logger.LogError($"Failed to load AudioClip from path: {path} Full error: {uwr.error}");
+                    else
+                    {
+                        clip = DownloadHandlerAudioClip.GetContent(uwr);
+                    }
+                }
+                catch (Exception err)
+                {
+                    SoundTool.Instance.logger.LogError($"{err.Message}, {err.StackTrace}");
+                }
+            }
+
+            return clip;
         }
     }
 }

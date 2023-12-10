@@ -7,6 +7,7 @@
         <Version>1.3.0</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
+        <RepositoryUrl>https://github.com/no00ob/LCSoundTool</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
@@ -58,4 +59,8 @@
         <LastGenOutput>Resources.Designer.cs</LastGenOutput>
       </EmbeddedResource>
     </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="xcopy /y $(TargetDir)$(TargetName).dll &quot;F:\NetcodePatcher\plugins\no00ob-LCSoundTool&quot;&#xD;&#xA;xcopy /y $(TargetDir)$(TargetName).pdb &quot;F:\NetcodePatcher\plugins\no00ob-LCSoundTool&quot;&#xD;&#xA;cd &quot;F:\NetcodePatcher\&quot;&#xD;&#xA;NetcodePatcher.dll plugins\ deps\&#xD;&#xA;xcopy /y F:\NetcodePatcher\plugins\no00ob-LCSoundTool\$(TargetName).dll &quot;C:/Users/Aki/AppData/Roaming/r2modmanPlus-local/LethalCompany/profiles/SoundTest/BepInEx/plugins/no00ob-LCSoundTool&quot;" />
+    </Target>
 </Project>

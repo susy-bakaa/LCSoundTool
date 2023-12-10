@@ -1,24 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Reflection;
-using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
-using GameNetcodeStuff;
 using HarmonyLib;
-using JetBrains.Annotations;
-using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 using LCSoundTool.Patches;
 using LCSoundTool.Utilities;
 using LCSoundTool.Networking;
 using LCSoundTool.Resources;
-using LCSoundToolMod.Patches;
+using DunGen;
+using System.Linq;
 
 namespace LCSoundTool
 {
@@ -46,80 +41,15 @@ namespace LCSoundTool
         //private GameObject soundToolGameObject;
         //public SoundToolUpdater updater { get; private set; }
 
-        public static bool networkSetup { get; private set; }
+        public static bool networkingInitialized { get; private set; }
 
-        public static Dictionary<string, AudioClip> replacedClips { get; private set; }
+        public static Dictionary<string, List<RandomAudioClip>> replacedClips { get; private set; }
         public static Dictionary<string, AudioClip> networkedClips { get { return NetworkHandler.networkedAudioClips; } }
 
         public static event Action ClientNetworkedAudioChanged { add { NetworkHandler.ClientNetworkedAudioChanged += value; } remove { NetworkHandler.ClientNetworkedAudioChanged -= value; } }
         public static event Action HostNetworkedAudioChanged { add { NetworkHandler.HostNetworkedAudioChanged += value; } remove { NetworkHandler.HostNetworkedAudioChanged -= value; } }
 
-        public static void ReplaceAudioClip(string originalName, AudioClip newClip)
-        {
-            if (string.IsNullOrEmpty(originalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-            if (newClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-
-            if (replacedClips.ContainsKey(originalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced! This is not allowed.");
-                return;
-            }
-
-            replacedClips.Add(originalName, newClip);
-        }
-
-        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip)
-        {
-            if (originalClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-            if (newClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-
-            ReplaceAudioClip(originalClip.name, newClip);
-        }
-
-        public static void RestoreAudioClip(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-
-            if (!replacedClips.ContainsKey(name))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
-            }
-
-            replacedClips.Remove(name);
-        }
-
-        public static void RestoreAudioClip(AudioClip clip)
-        {
-            if (clip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-
-            RestoreAudioClip(clip.name);
-        }
-
+        #region UNITY METHODS
         private void Awake()
         {
             if (Instance == null)
@@ -166,29 +96,30 @@ namespace LCSoundTool
             debugAudioSources = false;
             indepthDebugging = false;
 
-            replacedClips = new Dictionary<string, AudioClip>();
+            replacedClips = new Dictionary<string, List<RandomAudioClip>>();
 
+            SceneManager.sceneLoaded += OnSceneLoaded;
 
             harmony.PatchAll(typeof(AudioSourcePatch));
-            harmony.PatchAll(typeof(NetworkSceneManagerPatch));
+            //harmony.PatchAll(typeof(NetworkSceneManagerPatch));
             harmony.PatchAll(typeof(GameNetworkManagerPatch));
             harmony.PatchAll(typeof(StartOfRoundPatch));
         }
 
         private void Update()
         {
-            if (!networkSetup)
+            if (!networkingInitialized)
             {
                 if (NetworkHandler.Instance != null)
                 {
-                    networkSetup = true;
+                    networkingInitialized = true;
                 }
             }
             else
             {
                 if (NetworkHandler.Instance == null)
                 {
-                    networkSetup = false;
+                    networkingInitialized = false;
                 }
             }
 
@@ -219,44 +150,228 @@ namespace LCSoundTool
                 debugAudioSources = !debugAudioSources;
                 Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");
             }
-
-            //SoundToolMonobehaviours();
         }
 
-        //private void OnDestroy()
-        //{
-        //   SoundToolMonobehaviours();
-        //}
-
-        /*private void SoundToolMonobehaviours()
+        void OnDestroy()
         {
-            if (soundToolGameObject == null)
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+        #endregion
+
+        #region SCENE LOAD SETUP METHODS
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (Instance == null)
+                return;
+
+            if (debugAudioSources || indepthDebugging)
+                Instance.logger.LogDebug($"Grabbing all playOnAwake AudioSources for loaded scene {scene.name}");
+
+            AudioSource[] sources = GetAllPlayOnAwakeAudioSources();
+
+            if (debugAudioSources || indepthDebugging)
             {
-                GameObject previous = GameObject.Find("SoundToolObject");
+                Instance.logger.LogDebug($"Found a total of {sources.Length} playOnAwake AudioSources!");
+                Instance.logger.LogDebug($"Starting setup on {sources.Length - 3} compatable playOnAwake AudioSources...");
+            }
 
-                if (previous != null)
+            foreach (AudioSource s in sources)
+            {
+                if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX"))
                 {
-                    UnityEngine.Object.Destroy(previous);
-                }
-
-                soundToolGameObject = new GameObject("SoundToolObject");
-                updater = soundToolGameObject.AddComponent<SoundToolUpdater>();
-                soundToolGameObject.AddComponent<NetworkObject>();
-
-                updater.originSoundTool = this;
-
-                if (Instance != null && Instance != this)
-                {
-                    UnityEngine.Object.Destroy(Instance);
-                    Instance = this;
-                }
-                else if (Instance == null)
-                {
-                    Instance = this;
+                    if (s.transform.TryGetComponent(out AudioSourceExtension sExt))
+                    {
+                        sExt.playOnAwake = true;
+                        sExt.audioSource = s;
+                        sExt.loop = s.loop;
+                        s.playOnAwake = false;
+                        if (debugAudioSources || indepthDebugging)
+                            Instance.logger.LogDebug($"-Set- {System.Array.IndexOf(sources, s) + 1} {s} done!");
+                    }
+                    else
+                    {
+                        AudioSourceExtension sExtNew = s.gameObject.AddComponent<AudioSourceExtension>();
+                        sExtNew.audioSource = s;
+                        sExtNew.playOnAwake = true;
+                        sExtNew.loop = s.loop;
+                        s.playOnAwake = false;
+                        if (debugAudioSources || indepthDebugging)
+                            Instance.logger.LogDebug($"-Add- {System.Array.IndexOf(sources, s) + 1} {s} done!");
+                    }
                 }
             }
-        }*/
 
+            if (debugAudioSources || indepthDebugging)
+                Instance.logger.LogDebug($"Done setting up {sources.Length - 3} compatable playOnAwake AudioSources!");
+        }
+
+        public AudioSource[] GetAllPlayOnAwakeAudioSources()
+        {
+            AudioSource[] sources = FindObjectsOfType<AudioSource>(true);
+            List<AudioSource> results = new List<AudioSource>();
+
+            for (int i = 0; i < sources.Length; i++)
+            {
+                if (sources[i].playOnAwake)
+                {
+                    results.Add(sources[i]);
+                }
+            }
+
+            return results.ToArray();
+        }
+        #endregion
+
+        #region REPLACEMENT METHODS
+        public static void ReplaceAudioClip(string originalName, AudioClip newClip)
+        {
+            if (string.IsNullOrEmpty(originalName))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+
+            string clipName = newClip.GetName();
+            float chance = 100f;
+
+            // If clipName contains "-number", parse the chance
+            if (clipName.Contains("_"))
+            {
+                string[] parts = clipName.Split('_');
+                clipName = parts[0];
+                if (parts.Length == 2)
+                {
+                    if (int.TryParse(parts[1], out int parsedChance))
+                    {
+                        chance = parsedChance * 0.01f;
+                    }
+                }
+                else
+                {
+                    for (int i = 1; i < parts.Length; i++)
+                    {
+                        if (int.TryParse(parts[1], out int parsedChance))
+                        {
+                            chance = parsedChance * 0.01f;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (replacedClips.ContainsKey(originalName) && chance >= 100f)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with 100% chance of playback! This is not allowed.");
+                return;
+            }
+
+            // Ensure the chance is within the valid range
+            chance = Mathf.Clamp01(chance);
+
+            // If the clipName already exists in the dictionary, add the new audio clip with its chance
+            if (replacedClips.ContainsKey(originalName))
+            {
+                replacedClips[originalName].Add(new RandomAudioClip(newClip, chance));
+            }
+            // If the clipName doesn't exist, create a new entry in the dictionary
+            else
+            {
+                replacedClips[originalName] = new List<RandomAudioClip> { new RandomAudioClip(newClip, chance) };
+            }
+
+            float totalChance = 0;
+
+            for (int i = 0; i < replacedClips[originalName].Count(); i++)
+            {
+                totalChance += replacedClips[originalName][i].chance;
+            }
+
+            if ((totalChance < 1f || totalChance > 1f) && replacedClips[originalName].Count() > 1)
+            {
+                Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[originalName].Count()} random audio clips for audio clip {originalName} does not equal 100%");
+            }
+
+            //replacedClips.Add(originalName, newClip);
+        }
+
+        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip)
+        {
+            if (originalClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+
+            ReplaceAudioClip(originalClip.GetName(), newClip);
+        }
+
+        public static void RemoveRandomAudioClip(string name, float chance)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+
+            if (!replacedClips.ContainsKey(name))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
+                return;
+            }
+
+            if (chance > 0f)
+            {
+                for (int i = 0; i < replacedClips[name].Count(); i++)
+                {
+                    if (replacedClips[name][i].chance == chance)
+                    {
+                        replacedClips[name].RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        public static void RestoreAudioClip(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+
+            if (!replacedClips.ContainsKey(name))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
+                return;
+            }
+
+            replacedClips.Remove(name);
+        }
+
+        public static void RestoreAudioClip(AudioClip clip)
+        {
+            if (clip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+
+            RestoreAudioClip(clip.GetName());
+        }
+        #endregion
+
+        #region CLIP LOADING METHODS
         public static AudioClip GetAudioClip(string modFolder, string soundName)
         {
             return GetAudioClip(modFolder, string.Empty, soundName);
@@ -326,7 +441,7 @@ namespace LCSoundTool
             if (tryLoading)
             {
                 Instance.logger.LogDebug($"Loading AudioClip {soundName} from{legacy}path: {path}");
-                result = LoadClip(path);
+                result = WavUtility.LoadFromDiskToAudioClip(path);
                 Instance.logger.LogDebug($"Finished loading AudioClip {soundName} with length of {result.length}!");
             }
             else
@@ -334,59 +449,16 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Failed to load AudioClip {soundName} from invalid{legacy}path at {path}!");
             }
 
-            result.name = soundName.Replace(".wav","");
+            // Workaround to ensure the clip always gets named because for some reason Unity doesn't always get the name and leaves it blank sometimes???
+            if (string.IsNullOrEmpty(result.GetName()))
+                result.name = soundName.Replace(".wav","");
 
             // return the clip we got
             return result;
         }
+        #endregion
 
-        static AudioClip LoadClip(string path)
-        {
-            AudioClip clip = null;
-            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.WAV))
-            {
-                uwr.SendWebRequest();
-
-                // we have to wrap tasks in try/catch, otherwise it will just fail silently
-                try
-                {
-                    while (!uwr.isDone)
-                    {
-                        
-                    }
-
-                    if (uwr.result != UnityWebRequest.Result.Success)
-                        Instance.logger.LogError($"Failed to load AudioClip from path: {path} Full error: {uwr.error}");
-                    else
-                    {
-                        clip = DownloadHandlerAudioClip.GetContent(uwr);
-                    }
-                }
-                catch (Exception err)
-                {
-                    Instance.logger.LogError($"{err.Message}, {err.StackTrace}");
-                }
-            }
-
-            return clip;
-        }
-
-        public AudioSource[] GetAllPlayOnAwakeAudioSources()
-        {
-            AudioSource[] sources = FindObjectsOfType<AudioSource>(true);
-            List<AudioSource> results = new List<AudioSource>();
-
-            for (int i = 0; i < sources.Length; i++)
-            {
-                if (sources[i].playOnAwake)
-                {
-                    results.Add(sources[i]);
-                }
-            }
-
-            return results.ToArray();
-        }
-
+        #region AUDIO NETWORKING METHODS
         public static void SendNetworkedAudioClip(AudioClip audioClip)
         {
             if (audioClip == null)
@@ -395,9 +467,9 @@ namespace LCSoundTool
                 return;
             }
 
-            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null)
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
-                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send {audioClip}! If you're sending things in Awake try some of the other built-in Unity methods!");
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send {audioClip}! If you're sending things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
                 return;
             }
 
@@ -417,13 +489,25 @@ namespace LCSoundTool
                 return;
             }
 
-            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null)
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
-                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to remove {audioClip}! If you're removing things in Awake try some of the other built-in Unity methods!");
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to remove {audioClip}! If you're removing things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
                 return;
             }
 
             NetworkHandler.Instance.RemoveAudioClipServerRpc(audioClip);
         }
+
+        public static void SyncNetworkedAudioClips()
+        {
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
+            {
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to sync networked audio! If you're syncing things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
+                return;
+            }
+
+            NetworkHandler.Instance.SyncAudioClipsServerRpc();
+        }
+        #endregion
     }
 }
