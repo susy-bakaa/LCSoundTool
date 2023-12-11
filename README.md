@@ -1,4 +1,6 @@
 # LC Sound Tool
+This mod is by default **FULLY CLIENT SIDE**, but if you enable the networking feature in the config it requires everyone to have it installed.
+
 Simplistic Lethal Company sound tool and debugger. Patches all native Unity AudioSource components allowing you to dynamically replace (almost) any sound in the game at the final stages of playback with one or multiple random options with specified chances by simply specifying new audio clip(s) and the original clip's name to this mod. Let's you easily load your own custom .wav sound files for your own mods. Experimental networking for sending and syncing audio clips across all of the connected players. Lastly, optionally allows logging all AudioSources playback, including PlayOneShot, PlayClipAtPoint etc. and the names of each clip playing into the BepInEx console when you press the F5 key. More in depth logging can be toggled with LeftAlt + F5.
 
 ## ATTENTION
@@ -9,7 +11,7 @@ This mod won't work without a mod of your own that does the replacing. This mod 
 - Press F5 to log all audio playback to BepInEx console.
 - Load your own custom .wav audio files for your mod.
 - Replace any audio clip with another one or multiple random ones.
-- Send audio clips over the network and optionally sync the hosts clips with all clients.
+- (Optional) Send audio clips over the network and optionally sync the hosts clips with all clients.
 
 ## Installation
 
@@ -92,6 +94,8 @@ using LCSoundTool;
 
 SoundTool.RestoreAudioClip("GhostDevicePing");
 ```
+Remember that to be able to utilize the networking features you need to enable the networking in the mod config file! If your mod makes use of the networking you should mention this to the users on the mod page so they know it isn't only clientside and they need to turn this config feature on.
+
 Networked audio clips:
 ```csharp
 using LCSoundTool;
@@ -146,6 +150,10 @@ If they're still not showing up just shoot me a msg in Discord (@no00ob) and we 
 
 Few of the AudioSources with playOnAwake do not work with this tool. They for some reason refuse to work. Might try to look at this later but for now check the bottom of the page for all the culprits.
 
+#### Why is the networking not working?
+
+Make sure you turn the feature on in the mod config. When networking is turned on everyone needs LCSoundTool installed to join a lobby or else you will get an error.
+
 #### Can you use this tool to record sounds or interact with the voice chat?
 
 No, not at the moment. I might look into this later.
@@ -165,6 +173,24 @@ Any version prior to 1.2.0 should and versions past that will not work. I tried 
 #### Can I contribute somehow?
 
 Yes. If you find any bugs or errors let me know and feel free to send pull requests my way if you feel like you can provide better programming or more features.
+
+## Config
+
+The config can be found from: `\GAME_LOCATION\Lethal Company\BepInEx\config\LCSoundTool.cfg`
+
+or if you're using mod managers you can find the config from here: [Example](https://i.imgur.com/OZAgeNL.png)
+
+```
+## Settings file was created by plugin LC Sound Tool v1.3.2
+## Plugin GUID: LCSoundTool
+
+[Experimental]
+
+## Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool to join.
+# Setting type: Boolean
+# Default value: false
+EnableNetworking = false
+```
 
 ## Known Issues
 

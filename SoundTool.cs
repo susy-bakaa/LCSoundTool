@@ -12,17 +12,18 @@ using LCSoundTool.Patches;
 using LCSoundTool.Utilities;
 using LCSoundTool.Networking;
 using LCSoundTool.Resources;
-using DunGen;
 using System.Linq;
 
 namespace LCSoundTool
 {
-    [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
+    [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, LCSoundToolMod.PluginInfo.PLUGIN_VERSION)]
     public class SoundTool : BaseUnityPlugin
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        private const string PLUGIN_VERSION = "1.3.1";
+        //private const string PLUGIN_VERSION = "1.3.2";
+
+        private ConfigEntry<bool> configUseNetworking;
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 
@@ -42,6 +43,7 @@ namespace LCSoundTool
         //public SoundToolUpdater updater { get; private set; }
 
         public static bool networkingInitialized { get; private set; }
+        public static bool networkingAvailable { get; private set; }
 
         public static Dictionary<string, List<RandomAudioClip>> replacedClips { get; private set; }
         public static Dictionary<string, AudioClip> networkedClips { get { return NetworkHandler.networkedAudioClips; } }
@@ -52,10 +54,14 @@ namespace LCSoundTool
         #region UNITY METHODS
         private void Awake()
         {
+            networkingAvailable = true;
+
             if (Instance == null)
             {
                 Instance = this;
             }
+
+            configUseNetworking = Config.Bind("Experimental", "EnableNetworking", false, "Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool to join.");
 
             // NetcodePatcher stuff
             var types = Assembly.GetExecutingAssembly().GetTypes();
@@ -76,20 +82,6 @@ namespace LCSoundTool
 
             logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
 
-            logger.LogDebug("Loading SoundTool AssetBundle...");
-
-            // AssetBundle for NetworkHandler gameobject
-            Assets.bundle = AssetBundle.LoadFromMemory(LCSoundToolMod.Properties.Resources.soundtool);
-
-            if (Assets.bundle == null)
-            {
-                logger.LogError("Failed to load SoundTool AssetBundle!");
-            }
-            else
-            {
-                logger.LogDebug("Finished loading SoundTool AssetBundle!");
-            }
-
             toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
             toggleIndepthDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftAlt });
 
@@ -97,30 +89,70 @@ namespace LCSoundTool
             indepthDebugging = false;
 
             replacedClips = new Dictionary<string, List<RandomAudioClip>>();
+        }
 
-            SceneManager.sceneLoaded += OnSceneLoaded;
+        private void Start()
+        {
+            if (!configUseNetworking.Value)
+            {
+                networkingAvailable = false;
+                Instance.logger.LogWarning($"Networking disabled. Mod in fully client side mode, but no networked actions can take place!");
+            }
+            else
+            {
+                networkingAvailable = true;
+            }
+
+            if (configUseNetworking.Value)
+            {
+                logger.LogDebug("Loading SoundTool AssetBundle...");
+
+                // AssetBundle for NetworkHandler gameobject
+                Assets.bundle = AssetBundle.LoadFromMemory(LCSoundToolMod.Properties.Resources.soundtool);
+
+                if (Assets.bundle == null)
+                {
+                    logger.LogError("Failed to load SoundTool AssetBundle!");
+                }
+                else
+                {
+                    logger.LogDebug("Finished loading SoundTool AssetBundle!");
+                }
+            }
 
             harmony.PatchAll(typeof(AudioSourcePatch));
             //harmony.PatchAll(typeof(NetworkSceneManagerPatch));
-            harmony.PatchAll(typeof(GameNetworkManagerPatch));
-            harmony.PatchAll(typeof(StartOfRoundPatch));
+            if (configUseNetworking.Value)
+            {
+                harmony.PatchAll(typeof(GameNetworkManagerPatch));
+                harmony.PatchAll(typeof(StartOfRoundPatch));
+            }
+
+            SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
         private void Update()
         {
-            if (!networkingInitialized)
+            if (configUseNetworking.Value)
             {
-                if (NetworkHandler.Instance != null)
+                if (!networkingInitialized)
                 {
-                    networkingInitialized = true;
+                    if (NetworkHandler.Instance != null)
+                    {
+                        networkingInitialized = true;
+                    }
+                }
+                else
+                {
+                    if (NetworkHandler.Instance == null)
+                    {
+                        networkingInitialized = false;
+                    }
                 }
             }
             else
             {
-                if (NetworkHandler.Instance == null)
-                {
-                    networkingInitialized = false;
-                }
+                networkingInitialized = false;
             }
 
             if (toggleIndepthDebugLog.IsDown() && !wasKeyDown2)
@@ -172,13 +204,13 @@ namespace LCSoundTool
             if (debugAudioSources || indepthDebugging)
             {
                 Instance.logger.LogDebug($"Found a total of {sources.Length} playOnAwake AudioSources!");
-                Instance.logger.LogDebug($"Starting setup on {sources.Length - 3} compatable playOnAwake AudioSources...");
+                Instance.logger.LogDebug($"Starting setup on {sources.Length} compatable playOnAwake AudioSources...");  // - 3
             }
 
             foreach (AudioSource s in sources)
             {
-                if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX"))
-                {
+                //if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX"))
+                //{
                     if (s.transform.TryGetComponent(out AudioSourceExtension sExt))
                     {
                         sExt.playOnAwake = true;
@@ -187,6 +219,7 @@ namespace LCSoundTool
                         s.playOnAwake = false;
                         if (debugAudioSources || indepthDebugging)
                             Instance.logger.LogDebug($"-Set- {System.Array.IndexOf(sources, s) + 1} {s} done!");
+                        s.Play();
                     }
                     else
                     {
@@ -197,12 +230,13 @@ namespace LCSoundTool
                         s.playOnAwake = false;
                         if (debugAudioSources || indepthDebugging)
                             Instance.logger.LogDebug($"-Add- {System.Array.IndexOf(sources, s) + 1} {s} done!");
+                        s.Play();
                     }
-                }
+                //}
             }
 
             if (debugAudioSources || indepthDebugging)
-                Instance.logger.LogDebug($"Done setting up {sources.Length - 3} compatable playOnAwake AudioSources!");
+                Instance.logger.LogDebug($"Done setting up {sources.Length} compatable playOnAwake AudioSources!"); // - 3
         }
 
         public AudioSource[] GetAllPlayOnAwakeAudioSources()
@@ -451,6 +485,12 @@ namespace LCSoundTool
         #region AUDIO NETWORKING METHODS
         public static void SendNetworkedAudioClip(AudioClip audioClip)
         {
+            if (!Instance.configUseNetworking.Value)
+            {
+                Instance.logger.LogWarning($"Networking disabled! Failed to send {audioClip}!");
+                return;
+            }
+
             if (audioClip == null)
             {
                 Instance.logger.LogWarning($"audioClip variable of SendAudioClip not assigned! Failed to send {audioClip}!");
@@ -473,6 +513,12 @@ namespace LCSoundTool
 
         public static void RemoveNetworkedAudioClip(string audioClip)
         {
+            if (!Instance.configUseNetworking.Value)
+            {
+                Instance.logger.LogWarning($"Networking disabled! Failed to remove {audioClip}!");
+                return;
+            }
+
             if (string.IsNullOrEmpty(audioClip))
             {
                 Instance.logger.LogWarning($"audioClip variable of RemoveAudioClip not assigned! Failed to remove {audioClip}!");
@@ -490,6 +536,12 @@ namespace LCSoundTool
 
         public static void SyncNetworkedAudioClips()
         {
+            if (!Instance.configUseNetworking.Value)
+            {
+                Instance.logger.LogWarning($"Networking disabled! Failed to sync audio clips!");
+                return;
+            }
+
             if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
                 Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to sync networked audio! If you're syncing things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
