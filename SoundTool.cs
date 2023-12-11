@@ -243,23 +243,13 @@ namespace LCSoundTool
             if (clipName.Contains("-"))
             {
                 string[] parts = clipName.Split('-');
-                clipName = parts[0];
-                if (parts.Length == 2)
+                if (parts.Length > 1)
                 {
-                    if (int.TryParse(parts[1], out int parsedChance))
+                    string lastPart = parts[parts.Length - 1];
+                    if (int.TryParse(lastPart, out int parsedChance))
                     {
                         chance = parsedChance * 0.01f;
-                    }
-                }
-                else
-                {
-                    for (int i = 1; i < parts.Length; i++)
-                    {
-                        if (int.TryParse(parts[1], out int parsedChance))
-                        {
-                            chance = parsedChance * 0.01f;
-                            break;
-                        }
+                        clipName = string.Join("-", parts, 0, parts.Length - 1);
                     }
                 }
             }
