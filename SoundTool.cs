@@ -22,7 +22,7 @@ namespace LCSoundTool
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        private const string PLUGIN_VERSION = "1.3.0";
+        private const string PLUGIN_VERSION = "1.3.1";
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 
@@ -240,9 +240,9 @@ namespace LCSoundTool
             float chance = 100f;
 
             // If clipName contains "-number", parse the chance
-            if (clipName.Contains("_"))
+            if (clipName.Contains("-"))
             {
-                string[] parts = clipName.Split('_');
+                string[] parts = clipName.Split('-');
                 clipName = parts[0];
                 if (parts.Length == 2)
                 {

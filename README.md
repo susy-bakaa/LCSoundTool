@@ -70,7 +70,7 @@ using LCSoundTool;
 // Your own logic for the new sounds
 // This could be what is shown above or you could load it from an AssetBundle
 // When doing multiple random sounds you define the chance for each sound at the end of the .wav files name.
-// Eg. In this case if newRandomSound1 was called random_25.wav and newRandomSound2 was called random_75.wav
+// Eg. In this case if newRandomSound1 was called random-25.wav and newRandomSound2 was called random-75.wav
 // newRandomSound1 would have a chance of 25% and newRandomSound2 would have a chance of 75%
 
 AudioClip newRandomSound1;
