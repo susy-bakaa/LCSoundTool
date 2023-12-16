@@ -607,6 +607,133 @@ namespace LCSoundTool
             // return the clip we got
             return result;
         }
+
+        public static AudioClip GetAudioClip(string modFolder, string soundName, AudioType audioType)
+        {
+            return GetAudioClip(modFolder, string.Empty, soundName, audioType);
+        }
+
+        public static AudioClip GetAudioClip(string modFolder, string subFolder, string soundName, AudioType audioType)
+        {
+            bool tryLoading = true;
+            string legacy = " ";
+
+            // path stuff
+            var path = Path.Combine(Paths.PluginPath, modFolder, subFolder, soundName);
+            var pathOmitSubDir = Path.Combine(Paths.PluginPath, modFolder, soundName);
+            var pathDir = Path.Combine(Paths.PluginPath, modFolder, subFolder);
+
+            var pathLegacy = Path.Combine(Paths.PluginPath, subFolder, soundName);
+            var pathDirLegacy = Path.Combine(Paths.PluginPath, subFolder);
+
+            // check if file and directory are valid, else skip loading
+            if (!Directory.Exists(pathDir))
+            {
+                if (!string.IsNullOrEmpty(subFolder))
+                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder}/{subFolder} does not exist!");
+                else
+                {
+                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder} does not exist!");
+                    if (!modFolder.Contains("-"))
+                        Instance.logger.LogWarning($"This sound mod might not be compatable with mod managers. You should contact the sound mod's author.");
+                }
+                //Directory.CreateDirectory(pathDir);
+                tryLoading = false;
+            }
+            if (!File.Exists(path))
+            {
+                Instance.logger.LogWarning($"Requested audio file does not exist at path {path}!");
+                tryLoading = false;
+
+                Instance.logger.LogDebug($"Looking for audio file from mod root instead at {pathOmitSubDir}...");
+                if (File.Exists(pathOmitSubDir))
+                {
+                    Instance.logger.LogDebug($"Found audio file at path {pathOmitSubDir}!");
+                    path = pathOmitSubDir;
+                    tryLoading = true;
+                }
+                else
+                {
+                    Instance.logger.LogWarning($"Requested audio file does not exist at mod root path {pathOmitSubDir}!");
+                }
+            }
+            if (Directory.Exists(pathDirLegacy))
+            {
+                if (!string.IsNullOrEmpty(subFolder))
+                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins/{subFolder} found!");
+                else if (!modFolder.Contains("-"))
+                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins found!");
+            }
+            if (File.Exists(pathLegacy))
+            {
+                Instance.logger.LogWarning($"Legacy path contains the requested audio file at path {pathLegacy}!");
+                legacy = " legacy ";
+                path = pathLegacy;
+                tryLoading = true;
+            }
+
+            switch (audioType)
+            {
+                case AudioType.wav:
+                    Instance.logger.LogDebug($"File defined as a WAV file!");
+                    break;
+                case AudioType.ogg:
+                    Instance.logger.LogDebug($"File defined as an Ogg Vorbis file!");
+                    break;
+                case AudioType.mp3:
+                    Instance.logger.LogDebug($"File defined as a MPEG MP3 file!");
+                    break;
+            }
+
+            AudioClip result = null;
+
+            if (tryLoading)
+            {
+                Instance.logger.LogDebug($"Loading AudioClip {soundName} from{legacy}path: {path}");
+
+                switch (audioType)
+                {
+                    case AudioType.wav:
+                        result = WavUtility.LoadFromDiskToAudioClip(path);
+                        break;
+                    case AudioType.ogg:
+                        result = OggUtility.LoadFromDiskToAudioClip(path);
+                        break;
+                    case AudioType.mp3:
+                        result = Mp3Utility.LoadFromDiskToAudioClip(path);
+                        break;
+                }
+
+                Instance.logger.LogDebug($"Finished loading AudioClip {soundName} with length of {result.length}!");
+            }
+            else
+            {
+                Instance.logger.LogWarning($"Failed to load AudioClip {soundName} from invalid{legacy}path at {path}!");
+            }
+
+            // Workaround to ensure the clip always gets named because for some reason Unity doesn't always get the name and leaves it blank sometimes???
+            if (string.IsNullOrEmpty(result.GetName()))
+            {
+                switch (audioType)
+                {
+                    case AudioType.wav:
+                        result.name = soundName.Replace(".wav", "");
+                        break;
+                    case AudioType.ogg:
+                        result.name = soundName.Replace(".ogg", "");
+                        break;
+                    case AudioType.mp3:
+                        result.name = soundName.Replace(".mp3", "");
+                        break;
+                }
+            }
+
+            if (result != null)
+                clipTypes.Add(result.GetName(), audioType);
+
+            // return the clip we got
+            return result;
+        }
         #endregion
 
         #region AUDIO NETWORKING METHODS
