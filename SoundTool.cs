@@ -249,7 +249,11 @@ namespace LCSoundTool
             {
                 if (configSyncRandomSeed.Value == true)
                 {
-                    SendUnityRandomSeed();
+                    int newSeed = (int)DateTime.Now.Ticks;
+
+                    UnityEngine.Random.InitState(newSeed);
+
+                    SendUnityRandomSeed(newSeed);
                 }
             }
         }
@@ -690,7 +694,7 @@ namespace LCSoundTool
             NetworkHandler.Instance.SyncAudioClipsServerRpc();
         }
 
-        public static void SendUnityRandomSeed()
+        public static void SendUnityRandomSeed(int seed)
         {
             if (!Instance.configUseNetworking.Value)
             {
@@ -704,7 +708,7 @@ namespace LCSoundTool
                 return;
             }
 
-            NetworkHandler.Instance.SendSeedToClientsServerRpc(UnityEngine.Random.seed);
+            NetworkHandler.Instance.SendSeedToClientsServerRpc(seed);
         }
         #endregion
     }

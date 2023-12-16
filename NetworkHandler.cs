@@ -95,7 +95,7 @@ namespace LCSoundTool.Networking
         public void ReceiveSeedClientRpc(int seed)
         {
             UnityEngine.Random.InitState(seed);
-            SoundTool.Instance.logger.LogDebug($"Client received a new Unity Random seed {seed}!");
+            SoundTool.Instance.logger.LogDebug($"Client received a new Unity Random seed of {seed}!");
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -159,8 +159,11 @@ namespace LCSoundTool.Networking
         [ServerRpc(RequireOwnership = false)]
         public void SendSeedToClientsServerRpc(int seed)
         {
+            if (!IsHost)
+                return;
+
             ReceiveSeedClientRpc(seed);
-            SoundTool.Instance.logger.LogDebug($"Sending a new Unity Random seed to all clients...");
+            SoundTool.Instance.logger.LogDebug($"Sending a new Unity random seed of {seed} to all clients...");
         }
     }
 
