@@ -4,7 +4,12 @@ using UnityEngine.Networking;
 
 namespace LCSoundTool.Utilities
 {
-    public static class WavUtility
+    // Currently this class is identical to WavUtility besides the last method and surprisingly it seems to function fine?
+    // In theory this byte conversion stuff should be only compatible with WAV audio or specifically PCM type audio.
+    // Maybe Unity internally stores MDCT audio loaded with UWR as PCM and thats why it works or something. No idea. >O<
+    // But it does work. I decided tp leave it in it's own seperate duplicate class however.
+    // Mostly in case I WOULD need to give it it's own functionality later or maybe it doesn't work in all cases or something similar.
+    public static class Mp3Utility
     {
         public static byte[] AudioClipToByteArray(AudioClip audioClip, out float[] samples)
         {
@@ -52,7 +57,7 @@ namespace LCSoundTool.Utilities
         public static AudioClip LoadFromDiskToAudioClip(string path)
         {
             AudioClip clip = null;
-            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.WAV))
+            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.MPEG))
             {
                 uwr.SendWebRequest();
 
@@ -65,7 +70,7 @@ namespace LCSoundTool.Utilities
                     }
 
                     if (uwr.result != UnityWebRequest.Result.Success)
-                        SoundTool.Instance.logger.LogError($"Failed to load WAV AudioClip from path: {path} Full error: {uwr.error}");
+                        SoundTool.Instance.logger.LogError($"Failed to load MP3 AudioClip from path: {path} Full error: {uwr.error}");
                     else
                     {
                         clip = DownloadHandlerAudioClip.GetContent(uwr);

@@ -24,6 +24,7 @@ namespace LCSoundTool
         //private const string PLUGIN_VERSION = "1.3.2";
 
         private ConfigEntry<bool> configUseNetworking;
+        private ConfigEntry<bool> configSyncRandomSeed;
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
 
@@ -51,6 +52,10 @@ namespace LCSoundTool
         public static event Action ClientNetworkedAudioChanged { add { NetworkHandler.ClientNetworkedAudioChanged += value; } remove { NetworkHandler.ClientNetworkedAudioChanged -= value; } }
         public static event Action HostNetworkedAudioChanged { add { NetworkHandler.HostNetworkedAudioChanged += value; } remove { NetworkHandler.HostNetworkedAudioChanged -= value; } }
 
+        public static Dictionary<string, AudioType> clipTypes { get; private set; }
+
+        public enum AudioType { wav, ogg, mp3 }
+
         #region UNITY METHODS
         private void Awake()
         {
@@ -61,7 +66,8 @@ namespace LCSoundTool
                 Instance = this;
             }
 
-            configUseNetworking = Config.Bind("Experimental", "EnableNetworking", false, "Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool to join.");
+            configUseNetworking = Config.Bind("Experimental", "EnableNetworking", false, "Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool installed and networking enabled to join.");
+            configSyncRandomSeed = Config.Bind("Experimental", "SyncUnityRandomSeed", false, "Whether or not to sync the default Unity randomization seed with all clients. For this feature, networking has to be set to true. Will send the UnityEngine.Random.seed from the host to all clients automatically upon loading a networked scene.");
 
             // NetcodePatcher stuff
             var types = Assembly.GetExecutingAssembly().GetTypes();
@@ -89,6 +95,7 @@ namespace LCSoundTool
             indepthDebugging = false;
 
             replacedClips = new Dictionary<string, List<RandomAudioClip>>();
+            clipTypes = new Dictionary<string, AudioType>();
         }
 
         private void Start()
@@ -237,6 +244,14 @@ namespace LCSoundTool
 
             if (debugAudioSources || indepthDebugging)
                 Instance.logger.LogDebug($"Done setting up {sources.Length} compatable playOnAwake AudioSources!"); // - 3
+
+            if (networkingAvailable && networkingInitialized)
+            {
+                if (configSyncRandomSeed.Value == true)
+                {
+                    SendUnityRandomSeed();
+                }
+            }
         }
 
         public AudioSource[] GetAllPlayOnAwakeAudioSources()
@@ -339,6 +354,72 @@ namespace LCSoundTool
             ReplaceAudioClip(originalClip.GetName(), newClip);
         }
 
+        public static void ReplaceAudioClip(string originalName, AudioClip newClip, float chance)
+        {
+            if (string.IsNullOrEmpty(originalName))
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+
+            string clipName = newClip.GetName();
+
+            if (replacedClips.ContainsKey(originalName) && chance >= 100f)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with 100% chance of playback! This is not allowed.");
+                return;
+            }
+
+            // Ensure the chance is within the valid range
+            chance = Mathf.Clamp01(chance);
+
+            // If the clipName already exists in the dictionary, add the new audio clip with its chance
+            if (replacedClips.ContainsKey(originalName))
+            {
+                replacedClips[originalName].Add(new RandomAudioClip(newClip, chance));
+            }
+            // If the clipName doesn't exist, create a new entry in the dictionary
+            else
+            {
+                replacedClips[originalName] = new List<RandomAudioClip> { new RandomAudioClip(newClip, chance) };
+            }
+
+            float totalChance = 0;
+
+            for (int i = 0; i < replacedClips[originalName].Count(); i++)
+            {
+                totalChance += replacedClips[originalName][i].chance;
+            }
+
+            if ((totalChance < 1f || totalChance > 1f) && replacedClips[originalName].Count() > 1)
+            {
+                Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[originalName].Count()} random audio clips for audio clip {originalName} does not equal 100%");
+            }
+
+            //replacedClips.Add(originalName, newClip);
+        }
+
+        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance)
+        {
+            if (originalClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+
+            ReplaceAudioClip(originalClip.GetName(), newClip, chance);
+        }
+
         public static void RemoveRandomAudioClip(string name, float chance)
         {
             if (string.IsNullOrEmpty(name))
@@ -403,6 +484,7 @@ namespace LCSoundTool
 
         public static AudioClip GetAudioClip(string modFolder, string subFolder, string soundName)
         {
+            AudioType audioType = AudioType.wav;
             bool tryLoading = true;
             string legacy = " ";
 
@@ -460,12 +542,37 @@ namespace LCSoundTool
                 tryLoading = true;
             }
 
+            string[] parts = soundName.Split('.');
+            if (parts[parts.Length - 1].ToLower().Contains("ogg"))
+            {
+                audioType = AudioType.ogg;
+                Instance.logger.LogDebug($"File detected as an Ogg Vorbis file!");
+            }
+            else if (parts[parts.Length - 1].ToLower().Contains("mp3"))
+            {
+                audioType = AudioType.mp3;
+                Instance.logger.LogDebug($"File detected as a MPEG MP3 file!");
+            }
+
             AudioClip result = null;
 
             if (tryLoading)
             {
                 Instance.logger.LogDebug($"Loading AudioClip {soundName} from{legacy}path: {path}");
-                result = WavUtility.LoadFromDiskToAudioClip(path);
+
+                switch (audioType)
+                {
+                    case AudioType.wav:
+                        result = WavUtility.LoadFromDiskToAudioClip(path);
+                        break;
+                    case AudioType.ogg:
+                        result = OggUtility.LoadFromDiskToAudioClip(path);
+                        break;
+                    case AudioType.mp3:
+                        result = Mp3Utility.LoadFromDiskToAudioClip(path);
+                        break;
+                }
+
                 Instance.logger.LogDebug($"Finished loading AudioClip {soundName} with length of {result.length}!");
             }
             else
@@ -475,7 +582,23 @@ namespace LCSoundTool
 
             // Workaround to ensure the clip always gets named because for some reason Unity doesn't always get the name and leaves it blank sometimes???
             if (string.IsNullOrEmpty(result.GetName()))
-                result.name = soundName.Replace(".wav","");
+            {
+                switch (audioType)
+                {
+                    case AudioType.wav:
+                        result.name = soundName.Replace(".wav", "");
+                        break;
+                    case AudioType.ogg:
+                        result.name = soundName.Replace(".ogg", "");
+                        break;
+                    case AudioType.mp3:
+                        result.name = soundName.Replace(".mp3", "");
+                        break;
+                }
+            }
+
+            if (result != null)
+                clipTypes.Add(result.GetName(), audioType);
 
             // return the clip we got
             return result;
@@ -503,7 +626,23 @@ namespace LCSoundTool
                 return;
             }
 
-            NetworkHandler.Instance.SendAudioClipServerRpc(audioClip.GetName(), WavUtility.AudioClipToByteArray(audioClip, out float[] samples));
+            string clipName = audioClip.GetName();
+
+            if (clipTypes.ContainsKey(clipName))
+            {
+                if (clipTypes[clipName] == AudioType.ogg)
+                {
+                    NetworkHandler.Instance.SendAudioClipServerRpc(clipName, OggUtility.AudioClipToByteArray(audioClip, out float[] samplesOgg));
+                    return;
+                }
+                else if (clipTypes[clipName] == AudioType.mp3)
+                {
+                    NetworkHandler.Instance.SendAudioClipServerRpc(clipName, Mp3Utility.AudioClipToByteArray(audioClip, out float[] samplesMp3));
+                    return;
+                }
+            }
+
+            NetworkHandler.Instance.SendAudioClipServerRpc(clipName, WavUtility.AudioClipToByteArray(audioClip, out float[] samplesWav));
         }
 
         public static void RemoveNetworkedAudioClip(AudioClip audioClip)
@@ -549,6 +688,23 @@ namespace LCSoundTool
             }
 
             NetworkHandler.Instance.SyncAudioClipsServerRpc();
+        }
+
+        public static void SendUnityRandomSeed()
+        {
+            if (!Instance.configUseNetworking.Value)
+            {
+                Instance.logger.LogWarning($"Networking disabled! Failed to send Unity random seed!");
+                return;
+            }
+
+            if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
+            {
+                Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send Unity Random seed! If you're sending the seed in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked methods run only after the player setups a networked connection!");
+                return;
+            }
+
+            NetworkHandler.Instance.SendSeedToClientsServerRpc(UnityEngine.Random.seed);
         }
         #endregion
     }
