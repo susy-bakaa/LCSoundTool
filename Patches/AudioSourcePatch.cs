@@ -70,6 +70,9 @@ namespace LCSoundTool.Patches
 
         private static void DebugPlayMethod(AudioSource instance)
         {
+            if (instance == null)
+                return;
+
             if (SoundTool.debugAudioSources && !SoundTool.indepthDebugging && instance != null)
             {
                 SoundTool.Instance.logger.LogDebug($"{instance} at {instance.transform.root} is playing {instance.clip.name}");
@@ -95,6 +98,9 @@ namespace LCSoundTool.Patches
 
         private static void DebugPlayDelayedMethod(AudioSource instance)
         {
+            if (instance == null)
+                return;
+
             if (SoundTool.debugAudioSources && !SoundTool.indepthDebugging && instance != null)
             {
                 SoundTool.Instance.logger.LogDebug($"{instance} at {instance.transform.root} is playing {instance.clip.name} with delay");
@@ -120,6 +126,9 @@ namespace LCSoundTool.Patches
 
         private static void DebugPlayClipAtPointMethod(AudioSource audioSource, Vector3 position)
         {
+            if (audioSource == null)
+                return;
+
             if (SoundTool.debugAudioSources && !SoundTool.indepthDebugging && audioSource != null)
             {
                 SoundTool.Instance.logger.LogDebug($"{audioSource} at {audioSource.transform.root} is playing {audioSource.clip.name} at point {position}");
@@ -145,6 +154,9 @@ namespace LCSoundTool.Patches
 
         private static void DebugPlayOneShotMethod(AudioSource source, AudioClip clip)
         {
+            if (source == null || clip == null)
+                return;
+
             if (SoundTool.debugAudioSources && !SoundTool.indepthDebugging && source != null)
             {
                 SoundTool.Instance.logger.LogDebug($"{source} at {source.transform.root} is playing one shot {clip.name}");
@@ -170,7 +182,8 @@ namespace LCSoundTool.Patches
 
         private static void RunDynamicClipReplacement(AudioSource instance)
         {
-            if (instance == null || instance.clip == null) return;
+            if (instance == null || instance.clip == null) 
+                return;
 
             string clipName = instance.clip.GetName();
 
@@ -233,7 +246,8 @@ namespace LCSoundTool.Patches
 
         private static AudioClip ReplaceClipWithNew(AudioClip original)
         {
-            if (original == null) return original;
+            if (original == null) 
+                return original;
 
             string clipName = original.GetName();
 

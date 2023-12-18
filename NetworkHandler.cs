@@ -37,8 +37,24 @@ namespace LCSoundTool.Networking
             // Check if the key (clipName) already exists in the dictionary
             if (!networkedAudioClips.ContainsKey(clipName))
             {
+                AudioClip newAudioClip = null;
+
                 // If it doesn't exist, create a new AudioClip and add it to the dictionary
-                AudioClip newAudioClip = WavUtility.ByteArrayToAudioClip(audioData, clipName);
+                if (SoundTool.clipTypes.ContainsKey(clipName))
+                {
+                    if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.ogg)
+                    {
+                        newAudioClip = OggUtility.ByteArrayToAudioClip(audioData, clipName);
+                    }
+                    else if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.mp3)
+                    {
+                        newAudioClip = Mp3Utility.ByteArrayToAudioClip(audioData, clipName);
+                    }
+                }
+
+                if (newAudioClip == null)
+                    newAudioClip = WavUtility.ByteArrayToAudioClip(audioData, clipName);
+
                 networkedAudioClips.Add(clipName, newAudioClip);
                 ClientNetworkedAudioChanged?.Invoke();
             }
@@ -75,6 +91,13 @@ namespace LCSoundTool.Networking
             }
         }
 
+        [ClientRpc]
+        public void ReceiveSeedClientRpc(int seed)
+        {
+            UnityEngine.Random.InitState(seed);
+            SoundTool.Instance.logger.LogDebug($"Client received a new Unity Random seed of {seed}!");
+        }
+
         [ServerRpc(RequireOwnership = false)]
         public void SendAudioClipServerRpc(string clipName, byte[] audioData)
         {
@@ -108,12 +131,39 @@ namespace LCSoundTool.Networking
         {
             if (networkedAudioClips.ContainsKey(clipName))
             {
-                ReceiveAudioClipClientRpc(clipName, WavUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samples));
+                byte[] clipData = null;
+
+                if (SoundTool.clipTypes.ContainsKey(clipName))
+                {
+                    if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.ogg)
+                    {
+                        clipData = OggUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesOgg);
+                    }
+                    else if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.mp3)
+                    {
+                        clipData = Mp3Utility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesMp3);
+                    }
+                }
+
+                if (clipData == null)
+                    clipData = WavUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesWav);
+
+                ReceiveAudioClipClientRpc(clipName, clipData);
             }
             else
             {
                 SoundTool.Instance.logger.LogWarning("Trying to obtain and sync a sound from the host that does not exist in the host's game!");
             }
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        public void SendSeedToClientsServerRpc(int seed)
+        {
+            if (!IsHost)
+                return;
+
+            ReceiveSeedClientRpc(seed);
+            SoundTool.Instance.logger.LogDebug($"Sending a new Unity random seed of {seed} to all clients...");
         }
     }
 

@@ -65,7 +65,7 @@ namespace LCSoundTool.Utilities
                     }
 
                     if (uwr.result != UnityWebRequest.Result.Success)
-                        SoundTool.Instance.logger.LogError($"Failed to load AudioClip from path: {path} Full error: {uwr.error}");
+                        SoundTool.Instance.logger.LogError($"Failed to load WAV AudioClip from path: {path} Full error: {uwr.error}");
                     else
                     {
                         clip = DownloadHandlerAudioClip.GetContent(uwr);
