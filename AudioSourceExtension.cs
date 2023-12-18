@@ -9,31 +9,16 @@ namespace LCSoundTool
         public bool playOnAwake = false;
         public bool loop = false;
 
-        /*void Awake()
-        {
-            if (audioSource == null)
-                return;
-
-            if (audioSource.clip == null)
-                return;
-
-            if (audioSource.isPlaying)
-                return;
-
-            if (playOnAwake)
-                audioSource.Play();
-
-            if (SoundTool.indepthDebugging)
-                SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Started playback of {audioSource} with clip {audioSource.clip} in Awake function!");
-        }*/
+        private bool updateHasBeenLogged = false;
+        private bool hasPlayed = false;
 
         void OnEnable()
         {
             if (audioSource == null)
                 return;
 
-            if (audioSource.clip == null)
-                return;
+            //if (audioSource.clip == null)
+            //    return;
 
             if (audioSource.isPlaying)
                 return;
@@ -41,8 +26,10 @@ namespace LCSoundTool
             if (playOnAwake)
                 audioSource.Play();
 
-            if (SoundTool.indepthDebugging)
-                SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Started playback of {audioSource} with clip {audioSource.clip} in OnEnable function!");
+            //if (SoundTool.debugAudioSources || SoundTool.indepthDebugging)
+            SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Started playback of {audioSource} with clip {audioSource.clip} in OnEnable function!");
+            updateHasBeenLogged = false;
+            hasPlayed = false;
         }
 
         void OnDisable()
@@ -50,8 +37,8 @@ namespace LCSoundTool
             if (audioSource == null)
                 return;
 
-            if (audioSource.clip == null)
-                return;
+            //if (audioSource.clip == null)
+            //    return;
 
             if (!audioSource.isPlaying)
                 return;
@@ -59,26 +46,51 @@ namespace LCSoundTool
             if (playOnAwake)
                 audioSource.Stop();
 
-            if (SoundTool.indepthDebugging)
-                SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Stopped playback of {audioSource} with clip {audioSource.clip} in OnDisable function!");
+            //if (SoundTool.debugAudioSources || SoundTool.indepthDebugging)
+            SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Stopped playback of {audioSource} with clip {audioSource.clip} in OnDisable function!");
+            updateHasBeenLogged = false;
+            hasPlayed = false;
         }
 
-        /*void Update()
+        void Update()
         {
             if (audioSource == null)
                 return;
 
             if (audioSource.clip == null)
-                return;
+            {
+                hasPlayed = false;
+            }
 
             if (audioSource.isPlaying)
+            {
+                updateHasBeenLogged = false;
                 return;
+            }
+
+            if (!audioSource.isActiveAndEnabled)
+            {
+                hasPlayed = false;
+                return;
+            }
 
             if (playOnAwake)
             {
-                audioSource.Play();
-                SoundTool.Instance.logger.LogDebug($"Started playback of {audioSource} with clip {audioSource.clip} in Update function!");
+                if (audioSource.clip != null && !hasPlayed)
+                {
+                    audioSource.Play();
+                    //if (SoundTool.debugAudioSources || SoundTool.indepthDebugging)
+                    SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Started playback of {audioSource} with clip {audioSource.clip} in Update function!");
+                    updateHasBeenLogged = false;
+                    hasPlayed = true;
+                }
+                else if (!updateHasBeenLogged)
+                {
+                    updateHasBeenLogged = true;
+                    //if (SoundTool.debugAudioSources || SoundTool.indepthDebugging)
+                    SoundTool.Instance.logger.LogDebug($"(AudioSourceExtension) Can not start playback of {audioSource} with missing clip in Update function!");
+                }
             }
-        }*/
+        }
     }
 }
