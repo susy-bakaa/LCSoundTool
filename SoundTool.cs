@@ -26,7 +26,6 @@ namespace LCSoundTool
 
         private ConfigEntry<bool> configUseNetworking;
         private ConfigEntry<bool> configSyncRandomSeed;
-        private ConfigEntry<bool> configUseNewPlayOnAwakePatching;
         private ConfigEntry<float> configPlayOnAwakePatchRepeatDelay;
 
         private readonly Harmony harmony = new Harmony(PLUGIN_GUID);
@@ -37,14 +36,22 @@ namespace LCSoundTool
 
         public KeyboardShortcut toggleAudioSourceDebugLog;
         public KeyboardShortcut toggleIndepthDebugLog;
+        public KeyboardShortcut toggleInformationalDebugLog;
         public bool wasKeyDown;
         public bool wasKeyDown2;
+        public bool wasKeyDown3;
 
         public static bool debugAudioSources;
         public static bool indepthDebugging;
+        public static bool infoDebugging;
 
-        //private GameObject soundToolGameObject;
-        //public SoundToolUpdater updater { get; private set; }
+        public static bool IsDebuggingOn()
+        {
+            if (debugAudioSources || indepthDebugging || infoDebugging)
+                return true;
+            else
+                return false;
+        }
 
         public static bool networkingInitialized { get; private set; }
         public static bool networkingAvailable { get; private set; }
@@ -71,8 +78,7 @@ namespace LCSoundTool
 
             configUseNetworking = Config.Bind("Experimental", "EnableNetworking", false, "Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool installed and networking enabled to join.");
             configSyncRandomSeed = Config.Bind("Experimental", "SyncUnityRandomSeed", false, "Whether or not to sync the default Unity randomization seed with all clients. For this feature, networking has to be set to true. Will send the UnityEngine.Random.seed from the host to all clients automatically upon loading a networked scene.");
-            configUseNewPlayOnAwakePatching = Config.Bind("Experimental", "UseNewPlayOnAwakePatching", true, "Whether or not to use the new and improved custom sound patching for all AudioSources with the playOnAwake flag set to true. This means no playOnAwake AudioSources will appear on the log but all of their sounds can be replaced without problems. I recommend having this set to true unless you're trying to figure out some playOnAwake sound's name.");
-            configPlayOnAwakePatchRepeatDelay = Config.Bind("Experimental", "NewPlayOnAwakePatchRepeatDelay", 90f, "How long to wait between checks for new playOnAwake AudioSources. Runs the same patching that is done when each scene is loaded with this delay between each run. DO NOT set too low or high. Anything below 30 or above 600 can cause issues. This time is in seconds. Set to 0 to disable rerunning the patch.");
+            configPlayOnAwakePatchRepeatDelay = Config.Bind("Experimental", "NewPlayOnAwakePatchRepeatDelay", 90f, "How long to wait between checks for new playOnAwake AudioSources. Runs the same patching that is done when each scene is loaded with this delay between each run. DO NOT set too low or high. Anything below 10 or above 600 can cause issues. This time is in seconds. Set to 0 to disable rerunning the patch, but be warned that this might break runtime initialized playOnAwake AudioSources.");
 
             // NetcodePatcher stuff
             var types = Assembly.GetExecutingAssembly().GetTypes();
@@ -95,9 +101,11 @@ namespace LCSoundTool
 
             toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
             toggleIndepthDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftAlt });
+            toggleInformationalDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftControl });
 
             debugAudioSources = false;
             indepthDebugging = false;
+            infoDebugging = false;
 
             replacedClips = new Dictionary<string, List<RandomAudioClip>>();
             clipTypes = new Dictionary<string, AudioType>();
@@ -108,7 +116,7 @@ namespace LCSoundTool
             if (!configUseNetworking.Value)
             {
                 networkingAvailable = false;
-                Instance.logger.LogWarning($"Networking disabled. Mod in fully client side mode, but no networked actions can take place!");
+                Instance.logger.LogWarning($"Networking disabled. Mod in fully client side mode, but no networked actions can take place! You can safely ignore this if you want the mod to run fully client side.");
             }
             else
             {
@@ -167,6 +175,22 @@ namespace LCSoundTool
                 networkingInitialized = false;
             }
 
+            if (toggleInformationalDebugLog.IsDown() && !wasKeyDown3)
+            {
+                wasKeyDown3 = true;
+                wasKeyDown2 = false;
+                wasKeyDown = false;
+            }
+            if (toggleInformationalDebugLog.IsUp() && wasKeyDown3)
+            {
+                wasKeyDown3 = false;
+                wasKeyDown2 = false;
+                wasKeyDown = false;
+                infoDebugging = !infoDebugging;
+                Instance.logger.LogDebug($"Toggling informational debug logs {infoDebugging}!");
+                return;
+            }
+
             if (toggleIndepthDebugLog.IsDown() && !wasKeyDown2)
             {
                 wasKeyDown2 = true;
@@ -178,6 +202,7 @@ namespace LCSoundTool
                 wasKeyDown = false;
                 debugAudioSources = !debugAudioSources;
                 indepthDebugging = debugAudioSources;
+                infoDebugging = debugAudioSources;
                 Instance.logger.LogDebug($"Toggling in-depth AudioSource debug logs {debugAudioSources}!");
                 return;
             }
@@ -192,6 +217,8 @@ namespace LCSoundTool
                 wasKeyDown = false;
                 wasKeyDown2 = false;
                 debugAudioSources = !debugAudioSources;
+                if (indepthDebugging && !debugAudioSources)
+                    indepthDebugging = false;
                 Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");
             }
         }
@@ -208,10 +235,7 @@ namespace LCSoundTool
             if (Instance == null)
                 return;
 
-            if (configUseNewPlayOnAwakePatching.Value)
-                PatchPlayOnAwakeAudioNew(scene);
-            else
-                PatchPlayOnAwakeAudio(scene);
+            PatchPlayOnAwakeAudio(scene);
 
             OnSceneLoadedNetworking();
 
@@ -224,14 +248,13 @@ namespace LCSoundTool
 
         private IEnumerator PatchPlayOnAwakeDelayed(Scene scene, float wait)
         {
-            logger.LogDebug($"Started playOnAwake patch coroutine with delay of {wait} seconds");
+            if (infoDebugging)
+                logger.LogDebug($"Started playOnAwake patch coroutine with delay of {wait} seconds");
             yield return new WaitForSecondsRealtime(wait);
-            logger.LogDebug($"Running playOnAwake patch coroutine!");
+            if (infoDebugging)
+                logger.LogDebug($"Running playOnAwake patch coroutine!");
 
-            if (configUseNewPlayOnAwakePatching.Value)
-                PatchPlayOnAwakeAudioNew(scene);
-            else
-                PatchPlayOnAwakeAudio(scene);
+            PatchPlayOnAwakeAudio(scene);
 
             float repeatWait = configPlayOnAwakePatchRepeatDelay.Value;
 
@@ -246,22 +269,14 @@ namespace LCSoundTool
             }
         }
 
-        private void PatchPlayOnAwakeAudioNew(Scene scene)
+        private void PatchPlayOnAwakeAudio(Scene scene)
         {
-            if (debugAudioSources || indepthDebugging)
+            if (infoDebugging)
                 Instance.logger.LogDebug($"Grabbing all playOnAwake AudioSources for loaded scene {scene.name}");
 
             AudioSource[] sources = GetAllPlayOnAwakeAudioSources();
 
-            if (indepthDebugging)
-            {
-                for (int i = 0; i < sources.Length; i++)
-                {
-                    Instance.logger.LogDebug($"Found playOnAwake AudioSource! Assigning index {i} to {sources[i]} with a clip {sources[i].clip.GetName()}!");
-                }
-            }
-
-            if (debugAudioSources || indepthDebugging)
+            if (infoDebugging)
             {
                 Instance.logger.LogDebug($"Found a total of {sources.Length} playOnAwake AudioSource(s)!");
                 Instance.logger.LogDebug($"Starting setup on {sources.Length} playOnAwake AudioSource(s)...");
@@ -269,76 +284,6 @@ namespace LCSoundTool
 
             foreach (AudioSource s in sources)
             {
-                if (s.clip == null)
-                {
-                    Instance.logger.LogDebug($"playOnAwake AudioSource {s} of index {sources.ToList().IndexOf(s)} does not contain a valid AudioClip! This means it might not be currently replaceable with LCSoundTool!");
-                }
-                else
-                {
-                    if (s.isActiveAndEnabled)
-                        s.Stop();
-
-                    string clipName = s.clip.GetName();
-
-                    if (replacedClips.TryGetValue(clipName, out List<RandomAudioClip> randomAudioClip))
-                    {
-                        // Calculate total chance
-                        float totalChance = 0f;
-                        foreach (RandomAudioClip rc in randomAudioClip)
-                        {
-                            totalChance += rc.chance;
-                        }
-
-                        // Generate a random value between 0 and totalChance
-                        float randomValue = UnityEngine.Random.Range(0f, totalChance);
-
-                        // Choose the clip based on the random value and chances
-                        foreach (RandomAudioClip rc in randomAudioClip)
-                        {
-                            if (randomValue <= rc.chance)
-                            {
-                                // Use the chosen audio clip
-                                s.clip = rc.clip;
-                                return;
-                            }
-
-                            // Subtract the chance of the current clip from randomValue
-                            randomValue -= rc.chance;
-                        }
-                    }
-                    else
-                    {
-                        if (debugAudioSources || indepthDebugging)
-                            Instance.logger.LogDebug($"No replacement clip found for playOnAwake AudioSource {s} of index {sources.ToList().IndexOf(s)} with clip {clipName}.");
-                    }
-
-                    if (s.isActiveAndEnabled)
-                        s.Play();
-                }
-            }
-
-            if (debugAudioSources || indepthDebugging)
-                Instance.logger.LogDebug($"Done setting up {sources.Length} playOnAwake AudioSource(s)!");
-        }
-
-        private void PatchPlayOnAwakeAudio(Scene scene)
-        {
-            if (debugAudioSources || indepthDebugging)
-                Instance.logger.LogDebug($"Grabbing all playOnAwake AudioSources for loaded scene {scene.name}");
-
-            AudioSource[] sources = GetAllPlayOnAwakeAudioSources();
-
-            if (debugAudioSources || indepthDebugging)
-            {
-                Instance.logger.LogDebug($"Found a total of {sources.Length} playOnAwake AudioSource(s)!");
-                Instance.logger.LogDebug($"Starting setup on {sources.Length} playOnAwake AudioSource(s)..."); // - 4 compatable
-            }
-
-            foreach (AudioSource s in sources)
-            {
-                //if (!s.name.Contains("ThrusterCloseAudio") && !s.name.Contains("ThrusterAmbientAudio") && !s.name.Contains("Ship3dSFX") && !s.name.Contains("Fireplace"))
-                //{
-
                 s.Stop();
 
                 if (s.transform.TryGetComponent(out AudioSourceExtension sExt))
@@ -347,10 +292,8 @@ namespace LCSoundTool
                     sExt.playOnAwake = true;
                     sExt.loop = s.loop;
                     s.playOnAwake = false;
-                    if (debugAudioSources || indepthDebugging)
+                    if (infoDebugging)
                         Instance.logger.LogDebug($"-Set- {System.Array.IndexOf(sources, s) + 1} {s} done!");
-                    //if (s.isActiveAndEnabled)
-                    //    s.Play();
                 }
                 else
                 {
@@ -359,19 +302,16 @@ namespace LCSoundTool
                     sExtNew.playOnAwake = true;
                     sExtNew.loop = s.loop;
                     s.playOnAwake = false;
-                    if (debugAudioSources || indepthDebugging)
+                    if (infoDebugging)
                         Instance.logger.LogDebug($"-Add- {System.Array.IndexOf(sources, s) + 1} {s} done!");
-                    //if (s.isActiveAndEnabled)
-                    //    s.Play();
                 }
-                //}
             }
 
-            if (debugAudioSources || indepthDebugging)
-                Instance.logger.LogDebug($"Done setting up {sources.Length} playOnAwake AudioSources!"); // - 4 compatable
+            if (infoDebugging)
+                Instance.logger.LogDebug($"Done setting up {sources.Length} playOnAwake AudioSources!");
         }
 
-        public void OnSceneLoadedNetworking()
+        private void OnSceneLoadedNetworking()
         {
             if (networkingAvailable && networkingInitialized)
             {
