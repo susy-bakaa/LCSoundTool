@@ -714,7 +714,7 @@ namespace LCSoundTool
             }
 
             if (result != null)
-                clipTypes.Add(result.GetName(), audioType);
+                clipTypes[result.GetName()] = audioType;
 
             // return the clip we got
             return result;
@@ -878,7 +878,7 @@ namespace LCSoundTool
             }
 
             if (result != null)
-                clipTypes.Add(result.GetName(), audioType);
+                clipTypes[result.GetName()] = audioType;
 
             // return the clip we got
             return result;
