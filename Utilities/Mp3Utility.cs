@@ -7,7 +7,7 @@ namespace LCSoundTool.Utilities
     // Currently this class is identical to WavUtility besides the last method and surprisingly it seems to function fine?
     // In theory this byte conversion stuff should be only compatible with WAV audio or specifically PCM type audio.
     // Maybe Unity internally stores MDCT audio loaded with UWR as PCM and thats why it works or something. No idea. >O<
-    // But it does work. I decided tp leave it in it's own seperate duplicate class however.
+    // But it does work. I decided to leave it in it's own seperate duplicate class however.
     // Mostly in case I WOULD need to give it it's own functionality later or maybe it doesn't work in all cases or something similar.
     public static class Mp3Utility
     {
