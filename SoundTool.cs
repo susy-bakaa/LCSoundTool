@@ -411,14 +411,26 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(originalName))
             {
-                replacedClips[originalName].AddClip(newClip, chance);
-                if (!string.IsNullOrEmpty(source))
-                    replacedClips[originalName].source = source;
+                if (replacedClips[originalName].source != source)
+                {
+                    if (replacedClips.ContainsKey($"{originalName}#{source}"))
+                    {
+                        replacedClips[$"{originalName}#{source}"].AddClip(newClip, chance);
+                    }
+                    else
+                    {
+                        replacedClips.Add($"{originalName}#{source}", new ReplacementAudioClip(newClip, chance, source));
+                    }
+                }
+                else
+                {
+                    replacedClips[originalName].AddClip(newClip, chance);
+                }
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips[originalName] = new ReplacementAudioClip(newClip, chance, source);
+                replacedClips.Add(originalName, new ReplacementAudioClip(newClip, chance, source));
             }
 
             float totalChance = 0;
@@ -523,14 +535,26 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(originalName))
             {
-                replacedClips[originalName].AddClip(newClip, chance);
-                if (!string.IsNullOrEmpty(source))
-                    replacedClips[originalName].source = source;
+                if (replacedClips[originalName].source != source)
+                {
+                    if (replacedClips.ContainsKey($"{originalName}#{source}"))
+                    {
+                        replacedClips[$"{originalName}#{source}"].AddClip(newClip, chance);
+                    }
+                    else
+                    {
+                        replacedClips.Add($"{originalName}#{source}", new ReplacementAudioClip(newClip, chance, source));
+                    }
+                }
+                else
+                {
+                    replacedClips[originalName].AddClip(newClip, chance);
+                }
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips[originalName] = new ReplacementAudioClip(newClip, chance, source);
+                replacedClips.Add(originalName, new ReplacementAudioClip(newClip, chance, source));
             }
 
             float totalChance = 0;
@@ -639,14 +663,26 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(originalName))
             {
-                replacedClips[originalName].AddClip(newClip, chance);
-                if (!string.IsNullOrEmpty(source))
-                    replacedClips[originalName].source = source;
+                if (replacedClips[originalName].source != source)
+                {
+                    if (replacedClips.ContainsKey($"{originalName}#{source}"))
+                    {
+                        replacedClips[$"{originalName}#{source}"].AddClip(newClip, chance);
+                    }
+                    else
+                    {
+                        replacedClips.Add($"{originalName}#{source}", new ReplacementAudioClip(newClip, chance, source));
+                    }
+                }
+                else
+                {
+                    replacedClips[originalName].AddClip(newClip, chance);
+                }
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips[originalName] = new ReplacementAudioClip(newClip, chance, source);
+                replacedClips.Add(originalName, new ReplacementAudioClip(newClip, chance, source));
             }
 
             float totalChance = 0;
@@ -756,14 +792,26 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(originalName))
             {
-                replacedClips[originalName].AddClip(newClip, chance);
-                if (!string.IsNullOrEmpty(source))
-                    replacedClips[originalName].source = source;
+                if (replacedClips[originalName].source != source)
+                {
+                    if (replacedClips.ContainsKey($"{originalName}#{source}"))
+                    {
+                        replacedClips[$"{originalName}#{source}"].AddClip(newClip, chance);
+                    }
+                    else
+                    {
+                        replacedClips.Add($"{originalName}#{source}", new ReplacementAudioClip(newClip, chance, source));
+                    }
+                }
+                else
+                {
+                    replacedClips[originalName].AddClip(newClip, chance);
+                }
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips[originalName] = new ReplacementAudioClip(newClip, chance, source);
+                replacedClips.Add(originalName, new ReplacementAudioClip(newClip, chance, source));
             }
 
             float totalChance = 0;

@@ -7,7 +7,7 @@ namespace LCSoundTool
     public class ReplacementAudioClip
     {
         public List<RandomAudioClip> clips;
-        public string source;
+        public string source = string.Empty;
         public bool canPlay = true;
 
         private bool initialized = false;
@@ -59,6 +59,31 @@ namespace LCSoundTool
             {
                 SoundTool.Instance.logger.LogDebug($"RandomAudioClip {rClip.clip.GetName()} ({chance}%) already exists withing this AudioClipContainer!");
             }
+        }
+
+        public bool Full()
+        {
+            if (!initialized)
+                Initialize();
+
+            float chance = 0f;
+
+            for (int i = 0; i < clips.Count; i++)
+            {
+                chance += clips[i].chance;
+            }
+
+            return chance >= 1f;
+        }
+
+        public bool ContainsClip(AudioClip clip, float chance)
+        {
+            if (!initialized)
+                Initialize();
+
+            RandomAudioClip rClip = new RandomAudioClip(clip, chance);
+
+            return clips.Contains(rClip);
         }
 
         private void Initialize()
