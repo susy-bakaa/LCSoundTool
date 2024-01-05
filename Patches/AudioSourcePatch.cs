@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 
@@ -9,6 +10,8 @@ namespace LCSoundTool.Patches
     internal class AudioSourcePatch
     {
         private static Dictionary<string, AudioClip> originalClips = new Dictionary<string, AudioClip>();
+
+        #region HARMONY PATCHES
 
         [HarmonyPatch(nameof(AudioSource.Play), new Type[] { })]
         [HarmonyPrefix]
@@ -69,7 +72,9 @@ namespace LCSoundTool.Patches
 
             DebugPlayOneShotMethod(source, clip);
         }
+        #endregion
 
+        #region DEBUG METHODS
         private static void DebugPlayMethod(AudioSource instance)
         {
             if (instance == null)
@@ -181,110 +186,67 @@ namespace LCSoundTool.Patches
                 }
             }
         }
+        #endregion
 
+        #region DYNAMIC CLIP REPLACEMENT METHODS
         private static void RunDynamicClipReplacement(AudioSource instance)
         {
             if (instance == null || instance.clip == null) 
                 return;
 
-            string clipName = instance.clip.GetName();
+            string sourceName = instance.gameObject.name;
+            string clipName;
             bool replaceClip = true;
 
-            // Check if clipName exists in the dictionary
-            if (SoundTool.replacedClips.ContainsKey(clipName))
+            if (originalClips.TryGetValue(sourceName, out AudioClip originalClip))
             {
-                if (!SoundTool.replacedClips[clipName].canPlay)
-                {
-                    return;
-                }
+                clipName = originalClip.GetName();
+            }
+            else
+            {
+                clipName = instance.clip.GetName();
+            }
 
-                if (!originalClips.ContainsKey(clipName))
-                {
-                    originalClips.Add(clipName, instance.clip);
-                }
+            string finalName = clipName;
 
-                if (!string.IsNullOrEmpty(SoundTool.replacedClips[clipName].source))
-                {
-                    replaceClip = false;
-                    string[] sources = SoundTool.replacedClips[clipName].source.Split(',');
+            if (SoundTool.replacedClips.Keys.Count > 0)
+            {
+                string[] keys = SoundTool.replacedClips.Keys.ToArray();
 
-                    if (instance != null && instance.gameObject.name != null)
+                if (keys.Length > 0)
+                {
+                    for (int i = 0; i < keys.Length; i++)
                     {
-                        if (sources.Length > 1)
+                        string[] splitName = keys[i].Split("#");
+
+                        if (splitName.Length == 2)
                         {
-                            for (int i = 0; i < sources.Length; i++)
+                            if (splitName[1].Contains(instance.gameObject.name))
                             {
-                                if (sources[i] == instance.gameObject.name)
-                                {
-                                    replaceClip = true;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (sources[0] == instance.gameObject.name)
-                            {
-                                replaceClip = true;
+                                finalName = $"{clipName}#{splitName[1]}";
                             }
                         }
                     }
-                }
-
-                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[clipName].clips;
-
-                // Calculate total chance
-                float totalChance = 0f;
-                foreach (RandomAudioClip rc in randomAudioClip)
-                {
-                    totalChance += rc.chance;
-                }
-
-                // Generate a random value between 0 and totalChance
-                float randomValue = UnityEngine.Random.Range(0f, totalChance);
-
-                // Choose the clip based on the random value and chances
-                foreach (RandomAudioClip rc in randomAudioClip)
-                {
-                    if (randomValue <= rc.chance)
-                    {
-                        // Return the chosen audio clip if allowed, otherwise revert it to vanilla and return the vanilla sound instead.
-                        if (replaceClip)
-                        {
-                            instance.clip = rc.clip;
-                            return;
-                        }
-                        else
-                        {
-                            if (originalClips.ContainsKey(clipName))
-                            {
-                                instance.clip = originalClips[clipName];
-                                originalClips.Remove(clipName);
-                                return;
-                            }
-                            return;
-                        }
-                    }
-
-                    // Subtract the chance of the current clip from randomValue
-                    randomValue -= rc.chance;
                 }
             }
-            else if (SoundTool.replacedClips.ContainsKey($"{clipName}#{instance.gameObject.name}"))
+
+            // Check if clipName exists in the dictionary
+            if (SoundTool.replacedClips.ContainsKey(finalName))
             {
-                if (!SoundTool.replacedClips[$"{clipName}#{instance.gameObject.name}"].canPlay)
+                if (!SoundTool.replacedClips[finalName].canPlay)
                 {
                     return;
                 }
 
-                if (!originalClips.ContainsKey($"{clipName}#{instance.gameObject.name}"))
+                if (!originalClips.ContainsKey(sourceName))
                 {
-                    originalClips.Add($"{clipName}#{instance.gameObject.name}", instance.clip);
+                    originalClips.Add(sourceName, instance.clip);
                 }
 
-                if (!string.IsNullOrEmpty(SoundTool.replacedClips[$"{clipName}#{instance.gameObject.name}"].source))
+                if (!string.IsNullOrEmpty(SoundTool.replacedClips[finalName].source))
                 {
                     replaceClip = false;
-                    string[] sources = SoundTool.replacedClips[$"{clipName}#{instance.gameObject.name}"].source.Split(',');
+                    string[] sources = SoundTool.replacedClips[finalName].source.Split(',');
 
                     if (instance != null && instance.gameObject.name != null)
                     {
@@ -308,7 +270,7 @@ namespace LCSoundTool.Patches
                     }
                 }
 
-                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[$"{clipName}#{instance.gameObject.name}"].clips;
+                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[finalName].clips;
 
                 // Calculate total chance
                 float totalChance = 0f;
@@ -333,10 +295,10 @@ namespace LCSoundTool.Patches
                         }
                         else
                         {
-                            if (originalClips.ContainsKey($"{clipName}#{instance.gameObject.name}"))
+                            if (originalClips.ContainsKey(sourceName))
                             {
-                                instance.clip = originalClips[$"{clipName}#{instance.gameObject.name}"];
-                                originalClips.Remove($"{clipName}#{instance.gameObject.name}");
+                                instance.clip = originalClips[sourceName];
+                                originalClips.Remove(sourceName);
                                 return;
                             }
                             return;
@@ -348,34 +310,12 @@ namespace LCSoundTool.Patches
                 }
             }
             // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
-            else if (originalClips.ContainsKey(clipName) || originalClips.ContainsKey($"{clipName}#{instance.gameObject.name}"))
+            else if (originalClips.ContainsKey(sourceName))
             {
-                if (originalClips.ContainsKey(clipName))
-                {
-                    instance.clip = originalClips[clipName];
-                    originalClips.Remove(clipName);
-                }
-                else
-                {
-                    instance.clip = originalClips[$"{clipName}#{instance.gameObject.name}"];
-                    originalClips.Remove($"{clipName}#{instance.gameObject.name}");
-                }
+                instance.clip = originalClips[sourceName];
+                originalClips.Remove(sourceName);
+                return;
             }
-
-            /*if (SoundTool.replacedClips.ContainsKey(clipName))
-            {
-                if (!originalClips.ContainsKey(clipName))
-                {
-                    originalClips.Add(clipName, instance.clip);
-                }
-
-                instance.clip = SoundTool.replacedClips[clipName];
-            }
-            else if (originalClips.ContainsKey(clipName))
-            {
-                instance.clip = originalClips[clipName];
-                originalClips.Remove(clipName);
-            }*/
         }
 
         private static AudioClip ReplaceClipWithNew(AudioClip original, AudioSource source = null)
@@ -386,100 +326,49 @@ namespace LCSoundTool.Patches
             string clipName = original.GetName();
             bool replaceClip = true;
 
-            // Check if clipName exists in the dictionary
-            if (SoundTool.replacedClips.ContainsKey(clipName))
+            string finalName = clipName;
+
+            if (source != null)
             {
-                if (!SoundTool.replacedClips[clipName].canPlay)
+                if (SoundTool.replacedClips.Keys.Count > 0)
                 {
-                    return original;
-                }
+                    string[] keys = SoundTool.replacedClips.Keys.ToArray();
 
-                if (!originalClips.ContainsKey(clipName))
-                {
-                    originalClips.Add(clipName, original);
-                }
-
-                if (!string.IsNullOrEmpty(SoundTool.replacedClips[clipName].source))
-                {
-                    replaceClip = false;
-                    string[] sources = SoundTool.replacedClips[clipName].source.Split(',');
-
-                    if (source != null && source.gameObject.name != null)
+                    if (keys.Length > 0)
                     {
-                        if (sources.Length > 1)
+                        for (int i = 0; i < keys.Length; i++)
                         {
-                            for (int i = 0; i < sources.Length; i++)
+                            string[] splitName = keys[i].Split("#");
+
+                            if (splitName.Length == 2)
                             {
-                                if (sources[i] == source.gameObject.name)
+                                if (splitName[1].Contains(source.gameObject.name))
                                 {
-                                    replaceClip = true;
+                                    finalName = $"{clipName}#{splitName[1]}";
                                 }
                             }
                         }
-                        else
-                        {
-                            if (sources[0] == source.gameObject.name)
-                            {
-                                replaceClip = true;
-                            }
-                        }
                     }
-                }
-
-                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[clipName].clips;
-
-                // Calculate total chance
-                float totalChance = 0f;
-                foreach (RandomAudioClip rc in randomAudioClip)
-                {
-                    totalChance += rc.chance;
-                }
-
-                // Generate a random value between 0 and totalChance
-                float randomValue = UnityEngine.Random.Range(0f, totalChance);
-
-                // Choose the clip based on the random value and chances
-                foreach (RandomAudioClip rc in randomAudioClip)
-                {
-                    if (randomValue <= rc.chance)
-                    {
-                        // Return the chosen audio clip if allowed, otherwise revert it to vanilla and return the vanilla sound instead.
-                        if (replaceClip)
-                        {
-                            return rc.clip;
-                        }
-                        else
-                        {
-                            if (originalClips.ContainsKey(clipName))
-                            {
-                                AudioClip temp = originalClips[clipName];
-                                originalClips.Remove(clipName);
-                                return temp;
-                            }
-                            return original;
-                        }
-                    }
-
-                    // Subtract the chance of the current clip from randomValue
-                    randomValue -= rc.chance;
                 }
             }
-            else if (SoundTool.replacedClips.ContainsKey($"{clipName}#{source.gameObject.name}"))
+
+            // Check if clipName exists in the dictionary
+            if (SoundTool.replacedClips.ContainsKey(finalName))
             {
-                if (!SoundTool.replacedClips[$"{clipName}#{source.gameObject.name}"].canPlay)
+                if (!SoundTool.replacedClips[finalName].canPlay)
                 {
                     return original;
                 }
 
-                if (!originalClips.ContainsKey($"{clipName}#{source.gameObject.name}"))
+                if (!originalClips.ContainsKey(finalName))
                 {
-                    originalClips.Add($"{clipName}#{source.gameObject.name}", original);
+                    originalClips.Add(finalName, original);
                 }
 
-                if (!string.IsNullOrEmpty(SoundTool.replacedClips[$"{clipName}#{source.gameObject.name}"].source))
+                if (!string.IsNullOrEmpty(SoundTool.replacedClips[finalName].source))
                 {
                     replaceClip = false;
-                    string[] sources = SoundTool.replacedClips[$"{clipName}#{source.gameObject.name}"].source.Split(',');
+                    string[] sources = SoundTool.replacedClips[finalName].source.Split(',');
 
                     if (source != null && source.gameObject.name != null)
                     {
@@ -503,7 +392,7 @@ namespace LCSoundTool.Patches
                     }
                 }
 
-                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[$"{clipName}#{source.gameObject.name}"].clips;
+                List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[finalName].clips;
 
                 // Calculate total chance
                 float totalChance = 0f;
@@ -527,10 +416,10 @@ namespace LCSoundTool.Patches
                         }
                         else
                         {
-                            if (originalClips.ContainsKey($"{clipName}#{source.gameObject.name}"))
+                            if (originalClips.ContainsKey(finalName))
                             {
-                                AudioClip temp = originalClips[$"{clipName}#{source.gameObject.name}"];
-                                originalClips.Remove($"{clipName}#{source.gameObject.name}");
+                                AudioClip temp = originalClips[finalName];
+                                originalClips.Remove(finalName);
                                 return temp;
                             }
                             return original;
@@ -542,39 +431,15 @@ namespace LCSoundTool.Patches
                 }
             }
             // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
-            else if (originalClips.ContainsKey(clipName) || originalClips.ContainsKey($"{clipName}#{source.gameObject.name}"))
+            else if (originalClips.ContainsKey(finalName))
             {
-                if (originalClips.ContainsKey(clipName))
-                {
-                    AudioClip temp = originalClips[clipName];
-                    originalClips.Remove(clipName);
-                    return temp;
-                }
-                else
-                {
-                    AudioClip temp = originalClips[$"{clipName}#{source.gameObject.name}"];
-                    originalClips.Remove($"{clipName}#{source.gameObject.name}");
-                    return temp;
-                }
-            }
-
-            /*if (SoundTool.replacedClips.ContainsKey(clipName))
-            {
-                if (!originalClips.ContainsKey(clipName))
-                {
-                    originalClips.Add(clipName, original);
-                }
-
-                return SoundTool.replacedClips[clipName];
-            }
-            else if (originalClips.ContainsKey(clipName))
-            {
-                AudioClip temp = originalClips[clipName];
-                originalClips.Remove(clipName);
+                AudioClip temp = originalClips[finalName];
+                originalClips.Remove(finalName);
                 return temp;
-            }*/
+            }
 
             return original;
         }
+        #endregion
     }
 }

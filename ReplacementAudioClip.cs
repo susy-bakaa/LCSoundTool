@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static LCSoundTool.Utilities.Extensions;
 
 namespace LCSoundTool
 {
@@ -19,14 +20,19 @@ namespace LCSoundTool
 
             RandomAudioClip rClip = new RandomAudioClip(clip, chance);
 
-            if (!clips.Contains(rClip) && this.source != source)
+            if (!clips.ContainsThisRandomAudioClip(rClip)) // && this.source != source
             {
                 clips.Add(rClip);
                 this.source = source;
             }
-            else
+            else if (SoundTool.infoDebugging)
             {
-                SoundTool.Instance.logger.LogDebug($"RandomAudioClip {rClip.clip.GetName()} ({chance}%) already exists withing this AudioClipContainer!");
+                SoundTool.Instance.logger.LogDebug($"RandomAudioClip {rClip.clip.GetName()} ({Mathf.RoundToInt(chance * 100f)}%) already exists withing this AudioClipContainer!");
+                SoundTool.Instance.logger.LogDebug($"- This AudioClipContainer contains the following clip(s):");
+                for (int i = 0; i < clips.Count; i++)
+                {
+                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}");
+                }
             }
         }
 
@@ -51,13 +57,18 @@ namespace LCSoundTool
 
             RandomAudioClip rClip = new RandomAudioClip(clip, chance);
 
-            if (!clips.Contains(rClip))
+            if (!clips.ContainsThisRandomAudioClip(rClip))
             {
                 clips.Add(rClip);
             }
-            else
+            else if (SoundTool.infoDebugging)
             {
-                SoundTool.Instance.logger.LogDebug($"RandomAudioClip {rClip.clip.GetName()} ({chance}%) already exists withing this AudioClipContainer!");
+                SoundTool.Instance.logger.LogDebug($"RandomAudioClip {rClip.clip.GetName()} ({Mathf.RoundToInt(chance * 100f)}%) already exists withing this AudioClipContainer!");
+                SoundTool.Instance.logger.LogDebug($"- This AudioClipContainer contains the following clip(s):");
+                for (int i = 0; i < clips.Count; i++)
+                {
+                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}");
+                }
             }
         }
 
@@ -83,7 +94,7 @@ namespace LCSoundTool
 
             RandomAudioClip rClip = new RandomAudioClip(clip, chance);
 
-            return clips.Contains(rClip);
+            return clips.ContainsThisRandomAudioClip(rClip);
         }
 
         private void Initialize()
