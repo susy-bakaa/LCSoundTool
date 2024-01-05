@@ -1,15 +1,19 @@
 # LC Sound Tool
 This mod is by default **FULLY CLIENT SIDE**, but if you enable the networking feature in the config it requires everyone to have it installed and for everyone to have the networking feature on.
 
-Simplistic Lethal Company sound tool/API and debugger. Patches all native Unity AudioSource components allowing you to dynamically replace any sound in the game at the final stages of playback with one or multiple random options with specified chances by simply supplying new audio clip(s) and the original clip's name to this mod. Let's you easily load your own custom .wav, .ogg or .mp3 sound files for use with your own mods. Experimental networking for sending and syncing audio clips across all of the connected players and syncing the Unity randomization seed for consistant random clips. Lastly, optionally allows logging all AudioSources playback, including PlayOneShot, PlayClipAtPoint etc. and the names of each audio clip playing into the BepInEx console and log when you press the F5 key. More in depth logging can be toggled with LeftAlt + F5 and more informational logs with LeftControl + F5.
+Simplistic Lethal Company sound tool/API and debugger. Patches all native Unity AudioSource components allowing you to dynamically replace any sound in the game at the final stages of playback depending on what is making it (audio source names) with one or multiple random options with specified chances by simply supplying new audio clip(s) and the original clip's name to this mod. 
+
+Let's you easily load your own custom .wav, .ogg or .mp3 sound files for use with your own mods. Experimental networking for sending and syncing audio clips across all of the connected players and syncing the Unity randomization seed for consistant random clips. 
+
+Lastly, optionally allows logging all AudioSources playback, including PlayOneShot, PlayClipAtPoint etc. and the names of each audio clip playing into the BepInEx console and log when you press the F5 key. More in depth logging can be toggled with LeftAlt + F5 and more informational logs with LeftControl + F5. All sounds replaced by this mod with LeftShift + F5.
 
 ## ATTENTION
 This mod won't work without a mod of your own that does the replacing. This mod is just purely a tool/API for replacing, loading and networking sound files. To be able to replace sound without creating a mod of your own you can try the following seperate mod utilizing this tool: https://thunderstore.io/c/lethal-company/p/Clementinise/CustomSounds/
 
 ## Features
 
-- Press F5 to log all audio playback to BepInEx console.
-- Load your own custom .wav, .ogg or .mp3 audio files for use within your mod.
+- Press F5 to log all audio playback to BepInEx console. + Various other logging possibilities.
+- Load your own custom loose .wav, .ogg or .mp3 audio files for use within your mod.
 - Replace any audio clip with another one or multiple random ones with specified chances for playback.
 - (Optional) Send audio clips over the network and sync the hosts clips with all clients.
 - (Optional) Sync the Unity randomization seed with all players.
@@ -75,7 +79,7 @@ The config can be found from: `\GAME_LOCATION\Lethal Company\BepInEx\config\LCSo
 or if you're using mod managers you can find the config from here: [Example](https://i.imgur.com/OZAgeNL.png)
 
 ```
-## Settings file was created by plugin LC Sound Tool v1.4.0
+## Settings file was created by plugin LC Sound Tool v1.5.0
 ## Plugin GUID: LCSoundTool
 
 [Experimental]
@@ -83,19 +87,27 @@ or if you're using mod managers you can find the config from here: [Example](htt
 ## Whether or not to use the networking built into this plugin. If set to true everyone in the lobby needs LCSoundTool installed and networking enabled to join.
 # Setting type: Boolean
 # Default value: false
-EnableNetworking = true
+EnableNetworking = false
 
 ## Whether or not to sync the default Unity randomization seed with all clients. For this feature, networking has to be set to true. Will send the UnityEngine.Random.seed from the host to all clients automatically upon loading a networked scene.
 # Setting type: Boolean
 # Default value: false
-SyncUnityRandomSeed = true
+SyncUnityRandomSeed = false
 
 ## How long to wait between checks for new playOnAwake AudioSources. Runs the same patching that is done when each scene is loaded with this delay between each run. DO NOT set too low or high. Anything below 10 or above 600 can cause issues. This time is in seconds. Set to 0 to disable rerunning the patch, but be warned that this might break runtime initialized playOnAwake AudioSources.
 # Setting type: Single
 # Default value: 90
 NewPlayOnAwakePatchRepeatDelay = 90
+
+[Logging]
+
+## Whether or not to print additional information logs created by this mod by default. If set to false, informational logs may be toggled on any time with LeftAlt + F5.
+# Setting type: Boolean
+# Default value: false
+PrintInfoByDefault = false
 ```
 
 ## Known Issues
 
-- Currently should be none :)
+- Currently should be mostly none :)
+- Some small bugs and edge cases can be found here and there, just let me know when you find one!
