@@ -399,44 +399,65 @@ namespace LCSoundTool
             string finalName = originalName;
             string clipName = newClip.GetName();
             string source = string.Empty;
+            string tag = string.Empty;
             float chance = 100f;
-
+            
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
-                string[] parts = clipName.Split('-');
-                if (parts.Length > 1)
+            string[] parts = clipName.Split('-');
+
+            if (infoDebugging)
+                Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                bool isNumeric = int.TryParse(parts[i], out _);
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                if (!isNumeric && !parts[i].Contains('_'))
                 {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            source = secondLastPart.Substring(1);
-                        }
-                    }
+                    tag = parts[i];
+                }
+            }
 
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
+            if (parts.Length > 1)
+            {
+                if (parts.Length > 2)
+                {
+                    string secondLastPart = parts[parts.Length - 2];
+                    if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
                     {
-                        chance = parsedChance * 0.01f;
+                        source = secondLastPart.Substring(1);
                     }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            source = lastPart.Substring(1);
-                        }
-                    }
+                }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
+                string lastPart = parts[parts.Length - 1];
+
+                if (int.TryParse(lastPart, out int parsedChance))
+                {
+                    chance = parsedChance * 0.01f;
                 }
                 else
                 {
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                    if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
+                    {
+                        source = lastPart.Substring(1);
+                    }
                 }
+
+                clipName = string.Join('-', parts, 0, parts.Length - 1);
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
+            }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(source))
@@ -456,12 +477,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
             }
 
             float totalChance = 0;
@@ -518,11 +539,29 @@ namespace LCSoundTool
             string finalName = originalName;
             string clipName = newClip.GetName();
             string source = string.Empty;
+            string tag = string.Empty;
 
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
                 string[] parts = clipName.Split('-');
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    bool isNumeric = int.TryParse(parts[i], out _);
+
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                    if (!isNumeric && !parts[i].Contains('_'))
+                    {
+                        tag = parts[i];
+                    }
+                }
+
                 if (parts.Length > 1)
                 {
                     if (parts.Length > 2)
@@ -548,13 +587,16 @@ namespace LCSoundTool
                         }
                     }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
+                    clipName = string.Join('-', parts, 0, parts.Length - 1);
+
                     if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
                 }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(source))
@@ -574,12 +616,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
             }
 
             float totalChance = 0;
@@ -639,12 +681,30 @@ namespace LCSoundTool
 
             string finalName = originalName;
             string clipName = newClip.GetName();
+            string tag = string.Empty;
             float chance = 100f;
 
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
                 string[] parts = clipName.Split('-');
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    bool isNumeric = int.TryParse(parts[i], out _);
+
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                    if (!isNumeric && !parts[i].Contains('_'))
+                    {
+                        tag = parts[i];
+                    }
+                }
+
                 if (parts.Length > 1)
                 {
                     if (parts.Length > 2)
@@ -670,13 +730,16 @@ namespace LCSoundTool
                         }
                     }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
+                    clipName = string.Join('-', parts, 0, parts.Length - 1);
+
                     if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
                 }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(source))
@@ -696,12 +759,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
             }
 
             float totalChance = 0;
@@ -774,12 +837,30 @@ namespace LCSoundTool
 
             string finalName = originalName;
             string clipName = newClip.GetName();
+            string tag = string.Empty;
             float chance = 100f;
 
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
                 string[] parts = clipName.Split('-');
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    bool isNumeric = int.TryParse(parts[i], out _);
+
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                    if (!isNumeric && !parts[i].Contains('_'))
+                    {
+                        tag = parts[i];
+                    }
+                }
+
                 if (parts.Length > 1)
                 {
                     if (parts.Length > 2)
@@ -805,13 +886,16 @@ namespace LCSoundTool
                         }
                     }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
+                    clipName = string.Join('-', parts, 0, parts.Length - 1);
+
                     if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
                 }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(finalSource))
@@ -831,12 +915,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource, tag));
             }
 
             float totalChance = 0;
@@ -898,11 +982,29 @@ namespace LCSoundTool
 
             string finalName = originalName;
             string clipName = newClip.GetName();
+            string tag = string.Empty;
 
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
                 string[] parts = clipName.Split('-');
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    bool isNumeric = int.TryParse(parts[i], out _);
+
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                    if (!isNumeric && !parts[i].Contains('_'))
+                    {
+                        tag = parts[i];
+                    }
+                }
+
                 if (parts.Length > 1)
                 {
                     if (parts.Length > 2)
@@ -928,13 +1030,16 @@ namespace LCSoundTool
                         }
                     }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
+                    clipName = string.Join('-', parts, 0, parts.Length - 1);
+
                     if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
                 }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(source))
@@ -954,12 +1059,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
             }
 
             float totalChance = 0;
@@ -1032,11 +1137,29 @@ namespace LCSoundTool
 
             string finalName = originalName;
             string clipName = newClip.GetName();
+            string tag = string.Empty;
 
             // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            if (clipName.Contains('-'))
             {
                 string[] parts = clipName.Split('-');
+
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
+
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    bool isNumeric = int.TryParse(parts[i], out _);
+
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
+
+                    if (!isNumeric && !parts[i].Contains('_'))
+                    {
+                        tag = parts[i];
+                    }
+                }
+
                 if (parts.Length > 1)
                 {
                     if (parts.Length > 2)
@@ -1062,13 +1185,16 @@ namespace LCSoundTool
                         }
                     }
 
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
+                    clipName = string.Join('-', parts, 0, parts.Length - 1);
+
                     if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
                 }
+            }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
             }
 
             if (!string.IsNullOrEmpty(finalSource))
@@ -1088,12 +1214,12 @@ namespace LCSoundTool
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance);
+                replacedClips[finalName].AddClip(newClip, chance, tag);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource, tag));
             }
 
             float totalChance = 0;
@@ -1426,6 +1552,7 @@ namespace LCSoundTool
         {
             AudioType audioType = AudioType.wav;
             bool tryLoading = true;
+            bool skipLegacyCheck = false;
             string legacy = " ";
 
             // path stuff
@@ -1450,6 +1577,12 @@ namespace LCSoundTool
                 //Directory.CreateDirectory(pathDir);
                 tryLoading = false;
             }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug("Skipping legacy path check...");
+                skipLegacyCheck = true;
+            }
             if (!File.Exists(path))
             {
                 Instance.logger.LogWarning($"Requested audio file does not exist at path {path}!");
@@ -1461,20 +1594,29 @@ namespace LCSoundTool
                     Instance.logger.LogDebug($"Found audio file at path {pathOmitSubDir}!");
                     path = pathOmitSubDir;
                     tryLoading = true;
+                    if (infoDebugging)
+                        Instance.logger.LogDebug("Skipping legacy path check...");
+                    skipLegacyCheck = true;
                 }
                 else
                 {
                     Instance.logger.LogWarning($"Requested audio file does not exist at mod root path {pathOmitSubDir}!");
                 }
             }
-            if (Directory.Exists(pathDirLegacy))
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug("Skipping legacy path check...");
+                skipLegacyCheck = true;
+            }
+            if (Directory.Exists(pathDirLegacy) && !skipLegacyCheck)
             {
                 if (!string.IsNullOrEmpty(subFolder))
                     Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins/{subFolder} found!");
                 else if (!modFolder.Contains("-"))
                     Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins found!");
             }
-            if (File.Exists(pathLegacy))
+            if (File.Exists(pathLegacy) && !skipLegacyCheck)
             {
                 Instance.logger.LogWarning($"Legacy path contains the requested audio file at path {pathLegacy}!");
                 legacy = " legacy ";
@@ -1503,7 +1645,8 @@ namespace LCSoundTool
             }
             else
             {
-                Instance.logger.LogWarning($"Failed to detect file type of a sound file! This may cause issues with other mod functionality. Sound: {soundName}");
+                audioType = AudioType.wav;
+                Instance.logger.LogWarning($"Failed to detect file type of a sound file! This may cause issues with other mod functionality. Sound defaulted to WAV. Sound: {soundName}");
             }
 
             AudioClip result = null;
@@ -1544,7 +1687,13 @@ namespace LCSoundTool
 
                         finalName = soundName.Replace(".wav", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1552,13 +1701,22 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
 
                         result.name = finalName;
                         break;
                     case AudioType.ogg:
                         finalName = soundName.Replace(".ogg", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1566,13 +1724,22 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
 
                         result.name = finalName;
                         break;
                     case AudioType.mp3:
                         finalName = soundName.Replace(".mp3", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1580,6 +1747,9 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         result.name = finalName;
                         break;
@@ -1612,6 +1782,7 @@ namespace LCSoundTool
         public static AudioClip GetAudioClip(string modFolder, string subFolder, string soundName, AudioType audioType)
         {
             bool tryLoading = true;
+            bool skipLegacyCheck = false;
             string legacy = " ";
 
             // path stuff
@@ -1636,6 +1807,12 @@ namespace LCSoundTool
                 //Directory.CreateDirectory(pathDir);
                 tryLoading = false;
             }
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug("Skipping legacy path check...");
+                skipLegacyCheck = true;
+            }
             if (!File.Exists(path))
             {
                 Instance.logger.LogWarning($"Requested audio file does not exist at path {path}!");
@@ -1647,20 +1824,29 @@ namespace LCSoundTool
                     Instance.logger.LogDebug($"Found audio file at path {pathOmitSubDir}!");
                     path = pathOmitSubDir;
                     tryLoading = true;
+                    if (infoDebugging)
+                        Instance.logger.LogDebug("Skipping legacy path check...");
+                    skipLegacyCheck = true;
                 }
                 else
                 {
                     Instance.logger.LogWarning($"Requested audio file does not exist at mod root path {pathOmitSubDir}!");
                 }
             }
-            if (Directory.Exists(pathDirLegacy))
+            else
+            {
+                if (infoDebugging)
+                    Instance.logger.LogDebug("Skipping legacy path check...");
+                skipLegacyCheck = true;
+            }
+            if (Directory.Exists(pathDirLegacy) && !skipLegacyCheck)
             {
                 if (!string.IsNullOrEmpty(subFolder))
                     Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins/{subFolder} found!");
                 else if (!modFolder.Contains("-"))
                     Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins found!");
             }
-            if (File.Exists(pathLegacy))
+            if (File.Exists(pathLegacy) && !skipLegacyCheck)
             {
                 Instance.logger.LogWarning($"Legacy path contains the requested audio file at path {pathLegacy}!");
                 legacy = " legacy ";
@@ -1681,6 +1867,10 @@ namespace LCSoundTool
                 case AudioType.mp3:
                     if (infoDebugging)
                         Instance.logger.LogDebug($"File defined as a MPEG MP3 file!");
+                    break;
+                default:
+                    if (infoDebugging)
+                        Instance.logger.LogDebug($"File type not defined and was defaulted to WAV file!");
                     break;
             }
 
@@ -1722,7 +1912,13 @@ namespace LCSoundTool
 
                         finalName = soundName.Replace(".wav", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1730,13 +1926,22 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
 
                         result.name = finalName;
                         break;
                     case AudioType.ogg:
                         finalName = soundName.Replace(".ogg", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1744,13 +1949,22 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
 
                         result.name = finalName;
                         break;
                     case AudioType.mp3:
                         finalName = soundName.Replace(".mp3", "");
 
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
+
                         nameParts = finalName.Split('/');
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
 
                         if (nameParts.Length <= 1)
                         {
@@ -1758,6 +1972,9 @@ namespace LCSoundTool
                         }
 
                         finalName = nameParts[nameParts.Length - 1];
+
+                        if (infoDebugging)
+                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
 
                         result.name = finalName;
                         break;

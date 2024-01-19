@@ -13,12 +13,12 @@ namespace LCSoundTool
 
         private bool initialized = false;
 
-        public ReplacementAudioClip(AudioClip clip, float chance, string source)
+        public ReplacementAudioClip(AudioClip clip, float chance, string source, string tag)
         {
             if (!initialized)
                 Initialize();
 
-            RandomAudioClip rClip = new RandomAudioClip(clip, chance);
+            RandomAudioClip rClip = new RandomAudioClip(clip, chance, tag);
 
             if (!clips.ContainsThisRandomAudioClip(rClip)) // && this.source != source
             {
@@ -31,7 +31,7 @@ namespace LCSoundTool
                 SoundTool.Instance.logger.LogDebug($"- This AudioClipContainer contains the following clip(s):");
                 for (int i = 0; i < clips.Count; i++)
                 {
-                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}");
+                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}% tagged as '{clips[i].tag}'");
                 }
             }
         }
@@ -50,12 +50,12 @@ namespace LCSoundTool
             source = string.Empty;
         }
 
-        public void AddClip(AudioClip clip, float chance)
+        public void AddClip(AudioClip clip, float chance, string tag)
         {
             if (!initialized)
                 Initialize();
 
-            RandomAudioClip rClip = new RandomAudioClip(clip, chance);
+            RandomAudioClip rClip = new RandomAudioClip(clip, chance, tag);
 
             if (!clips.ContainsThisRandomAudioClip(rClip))
             {
@@ -67,7 +67,7 @@ namespace LCSoundTool
                 SoundTool.Instance.logger.LogDebug($"- This AudioClipContainer contains the following clip(s):");
                 for (int i = 0; i < clips.Count; i++)
                 {
-                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}");
+                    SoundTool.Instance.logger.LogDebug($"-- Clip {i + 1} - {clips[i].clip.GetName()} with a chance of {Mathf.RoundToInt(clips[i].chance * 100f)}% tagged as '{clips[i].tag}'");
                 }
             }
         }
@@ -87,12 +87,12 @@ namespace LCSoundTool
             return chance >= 1f;
         }
 
-        public bool ContainsClip(AudioClip clip, float chance)
+        public bool ContainsClip(AudioClip clip, float chance, string tag)
         {
             if (!initialized)
                 Initialize();
 
-            RandomAudioClip rClip = new RandomAudioClip(clip, chance);
+            RandomAudioClip rClip = new RandomAudioClip(clip, chance, tag);
 
             return clips.ContainsThisRandomAudioClip(rClip);
         }

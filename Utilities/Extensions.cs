@@ -10,7 +10,7 @@ namespace LCSoundTool.Utilities
         {
             for (int i = 0; i < list.Count; i++)
             {
-                if (list[i].chance == thisClip.chance && list[i].clip.GetName() == thisClip.clip.GetName())
+                if (list[i].chance == thisClip.chance && list[i].clip.GetName() == thisClip.clip.GetName() && list[i].tag == thisClip.tag)
                 {
                     return true;
                 }
