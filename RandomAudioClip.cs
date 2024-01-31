@@ -8,13 +8,11 @@ namespace LCSoundTool
         public AudioClip clip;
         [Range(0, 1)]
         public float chance = 1f; // Default chance is 100%
-        public string tag;
 
-        public RandomAudioClip(AudioClip clip, float chance, string tag)
+        public RandomAudioClip(AudioClip clip, float chance)
         {
             this.clip = clip;
             this.chance = chance;
-            this.tag = tag;
         }
     }
 }

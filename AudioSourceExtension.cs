@@ -84,7 +84,7 @@ namespace LCSoundTool
                     updateHasBeenLogged = false;
                     hasPlayed = true;
                 }
-                else if (!updateHasBeenLogged)
+                else if (audioSource.clip == null && !updateHasBeenLogged)
                 {
                     updateHasBeenLogged = true;
                     if (SoundTool.infoDebugging)

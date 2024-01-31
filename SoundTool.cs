@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Xml.XPath;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -23,7 +24,6 @@ namespace LCSoundTool
     {
         private const string PLUGIN_GUID = "LCSoundTool";
         private const string PLUGIN_NAME = "LC Sound Tool";
-        //private const string PLUGIN_VERSION = "1.3.2";
 
         private ConfigEntry<bool> configUseNetworking;
         private ConfigEntry<bool> configSyncRandomSeed;
@@ -35,15 +35,6 @@ namespace LCSoundTool
         public static SoundTool Instance;
 
         internal ManualLogSource logger;
-
-        public KeyboardShortcut toggleAudioSourceDebugLog;
-        public KeyboardShortcut toggleIndepthDebugLog;
-        public KeyboardShortcut toggleInformationalDebugLog;
-        public KeyboardShortcut printAllSoundsDebugLog;
-        public bool wasKeyDown;
-        public bool wasKeyDown2;
-        public bool wasKeyDown3;
-        public bool wasKeyDown4;
 
         public static bool debugAudioSources;
         public static bool indepthDebugging;
@@ -66,7 +57,7 @@ namespace LCSoundTool
         public static event Action ClientNetworkedAudioChanged { add { NetworkHandler.ClientNetworkedAudioChanged += value; } remove { NetworkHandler.ClientNetworkedAudioChanged -= value; } }
         public static event Action HostNetworkedAudioChanged { add { NetworkHandler.HostNetworkedAudioChanged += value; } remove { NetworkHandler.HostNetworkedAudioChanged -= value; } }
 
-        public static Dictionary<string, AudioType> clipTypes { get; private set; }
+        //public static Dictionary<string, AudioType> clipTypes { get; private set; }
 
         public enum AudioType { wav, ogg, mp3 }
 
@@ -104,10 +95,13 @@ namespace LCSoundTool
 
             logger.LogInfo($"Plugin {PLUGIN_GUID} is loaded!");
 
-            toggleAudioSourceDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[0]);
-            toggleIndepthDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftAlt });
-            toggleInformationalDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftControl });
-            printAllSoundsDebugLog = new KeyboardShortcut(KeyCode.F5, new KeyCode[1] { KeyCode.LeftShift });
+            InputHelper.Initialize();
+
+            InputHelper.keybinds.Add("toggleAudioSourceDebugLog", new Keybind(new KeyboardShortcut(KeyCode.F5, new KeyCode[0]), ToggleDebug));
+            InputHelper.keybinds.Add("toggleIndepthDebugLog", new Keybind(new KeyboardShortcut(KeyCode.F5, [KeyCode.LeftAlt]), ToggleIndepthDebug));
+            InputHelper.keybinds.Add("toggleInformationalDebugLog", new Keybind(new KeyboardShortcut(KeyCode.F5, [KeyCode.LeftControl]), ToggleInfoDebug));
+            InputHelper.keybinds.Add("printAllSoundsDebugLog", new Keybind(new KeyboardShortcut(KeyCode.F5, [KeyCode.LeftShift]), PrintAllReplacedSounds));
+            InputHelper.keybinds.Add("printAllCurrentSoundsDebugLog", new Keybind(new KeyboardShortcut(KeyCode.F6, new KeyCode[0]), PrintAllCurrentSounds));
 
             debugAudioSources = false;
             indepthDebugging = false;
@@ -117,7 +111,7 @@ namespace LCSoundTool
                 infoDebugging = false;
 
             replacedClips = new Dictionary<string, ReplacementAudioClip>();
-            clipTypes = new Dictionary<string, AudioType>();
+            //clipTypes = new Dictionary<string, AudioType>();
         }
 
         private void Start()
@@ -184,82 +178,15 @@ namespace LCSoundTool
                 networkingInitialized = false;
             }
 
-            if (printAllSoundsDebugLog.IsDown() && !wasKeyDown4)
-            {
-                wasKeyDown4 = true;
-            }
-            if (printAllSoundsDebugLog.IsUp() && wasKeyDown4)
-            {
-                wasKeyDown4 = false;
+            if (InputHelper.CheckInput("printAllCurrentSoundsDebugLog")) return;
 
-                Instance.logger.LogDebug($"Printing all currently replaced sounds...");
-                Instance.logger.LogDebug($" ");
+            if (InputHelper.CheckInput("printAllSoundsDebugLog")) return;
 
-                string[] keys = replacedClips.Keys.ToArray();
+            if (InputHelper.CheckInput("toggleInformationalDebugLog")) return;
 
-                for (int i = 0; i < replacedClips.Count; i++)
-                {
-                    ReplacementAudioClip rClip = replacedClips[keys[i]];
+            if (InputHelper.CheckInput("toggleIndepthDebugLog")) return;
 
-                    Instance.logger.LogDebug($"Clip named {keys[i]} with {rClip.clips.Count} replacement clip(s)");
-                    Instance.logger.LogDebug($"- Clip can play? {rClip.canPlay}");
-                    Instance.logger.LogDebug($"- Clip audio source(s)? {rClip.source}");
-                    Instance.logger.LogDebug($"- All {rClip.clips.Count} clip(s):");
-                    for (int k = 0; k < rClip.clips.Count; k++)
-                    {
-                        Instance.logger.LogDebug($"-- Clip {k + 1} - {rClip.clips[k].clip.GetName()} with chance of {Mathf.RoundToInt(rClip.clips[k].chance * 100f)}%");
-                    }
-                }
-                Instance.logger.LogDebug($" ");
-                Instance.logger.LogDebug($"Finished printing all currently replaced sounds!");
-            }
-
-            if (toggleInformationalDebugLog.IsDown() && !wasKeyDown3)
-            {
-                wasKeyDown3 = true;
-                wasKeyDown2 = false;
-                wasKeyDown = false;
-            }
-            if (toggleInformationalDebugLog.IsUp() && wasKeyDown3)
-            {
-                wasKeyDown3 = false;
-                wasKeyDown2 = false;
-                wasKeyDown = false;
-                infoDebugging = !infoDebugging;
-                Instance.logger.LogDebug($"Toggling informational debug logs {infoDebugging}!");
-                return;
-            }
-
-            if (toggleIndepthDebugLog.IsDown() && !wasKeyDown2)
-            {
-                wasKeyDown2 = true;
-                wasKeyDown = false;
-            }
-            if (toggleIndepthDebugLog.IsUp() && wasKeyDown2)
-            {
-                wasKeyDown2 = false;
-                wasKeyDown = false;
-                debugAudioSources = !debugAudioSources;
-                indepthDebugging = debugAudioSources;
-                infoDebugging = debugAudioSources;
-                Instance.logger.LogDebug($"Toggling in-depth AudioSource debug logs {debugAudioSources}!");
-                return;
-            }
-
-            if (!wasKeyDown2 && !toggleIndepthDebugLog.IsDown() && toggleAudioSourceDebugLog.IsDown() && !wasKeyDown)
-            {
-                wasKeyDown = true;
-                wasKeyDown2 = false;
-            }
-            if (toggleAudioSourceDebugLog.IsUp() && wasKeyDown)
-            {
-                wasKeyDown = false;
-                wasKeyDown2 = false;
-                debugAudioSources = !debugAudioSources;
-                if (indepthDebugging && !debugAudioSources)
-                    indepthDebugging = false;
-                Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");
-            }
+            if (InputHelper.CheckInput("toggleAudioSourceDebugLog")) return;
         }
 
         void OnDestroy()
@@ -387,285 +314,81 @@ namespace LCSoundTool
         {
             if (string.IsNullOrEmpty(originalName))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed");
                 return;
             }
 
-            string finalName = originalName;
-            string clipName = newClip.GetName();
-            string source = string.Empty;
-            string tag = string.Empty;
-            float chance = 100f;
-            
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
-            {
-            string[] parts = clipName.Split('-');
-
-            if (infoDebugging)
-                Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-            for (int i = 0; i < parts.Length; i++)
-            {
-                bool isNumeric = int.TryParse(parts[i], out _);
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                if (!isNumeric && !parts[i].Contains('_'))
-                {
-                    tag = parts[i];
-                }
-            }
-
-            if (parts.Length > 1)
-            {
-                if (parts.Length > 2)
-                {
-                    string secondLastPart = parts[parts.Length - 2];
-                    if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                    {
-                        source = secondLastPart.Substring(1);
-                    }
-                }
-
-                string lastPart = parts[parts.Length - 1];
-
-                if (int.TryParse(lastPart, out int parsedChance))
-                {
-                    chance = parsedChance * 0.01f;
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                    {
-                        source = lastPart.Substring(1);
-                    }
-                }
-
-                clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
-            }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
-
-            if (!string.IsNullOrEmpty(source))
-            {
-                finalName = $"{originalName}#{source}";
-            }
-
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
-
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
-
-            // If the clipName already exists in the dictionary, add the new audio clip with its chance
-            if (replacedClips.ContainsKey(finalName))
-            {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
-            }
-            // If the clipName doesn't exist, create a new entry in the dictionary
-            else
-            {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
-            }
-
-            float totalChance = 0;
-
-            for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-            {
-                totalChance += replacedClips[finalName].clips[i].chance;
-            }
-
-            int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
-
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
-            } else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
-
-            //replacedClips.Add(originalName, newClip);
+            ReplaceAudioClipInternal(originalName, newClip, 1f, string.Empty);
         }
 
         public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip)
         {
-            if (originalClip == null)
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or original clip's name is empty! This is not allowed.");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
                 return;
             }
 
-            ReplaceAudioClip(originalClip.GetName(), newClip);
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, 1f, string.Empty);
         }
 
         public static void ReplaceAudioClip(string originalName, AudioClip newClip, float chance)
         {
             if (string.IsNullOrEmpty(originalName))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
                 return;
             }
 
-            string finalName = originalName;
-            string clipName = newClip.GetName();
-            string source = string.Empty;
-            string tag = string.Empty;
-
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
-            {
-                string[] parts = clipName.Split('-');
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    bool isNumeric = int.TryParse(parts[i], out _);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                    if (!isNumeric && !parts[i].Contains('_'))
-                    {
-                        tag = parts[i];
-                    }
-                }
-
-                if (parts.Length > 1)
-                {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            source = secondLastPart.Substring(1);
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        Instance.logger.LogDebug($"Clip {clipName} contains random chance specified in it's name ({parsedChance}%) but you're using the manually function to assign it's chance. ({Mathf.RoundToInt(chance * 100f)}%) The file name will be ignored.");
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            source = lastPart.Substring(1);
-                        }
-                    }
-
-                    clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
-                }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
-
-            if (!string.IsNullOrEmpty(source))
-            {
-                finalName = $"{originalName}#{source}";
-            }
-
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
-
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
-
-            // If the clipName already exists in the dictionary, add the new audio clip with its chance
-            if (replacedClips.ContainsKey(finalName))
-            {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
-            }
-            // If the clipName doesn't exist, create a new entry in the dictionary
-            else
-            {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
-            }
-
-            float totalChance = 0;
-
-            for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-            {
-                totalChance += replacedClips[finalName].clips[i].chance;
-            }
-
-            int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
-
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
-                Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100% (at least yet?)");
-            }
-            else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
-
-            //replacedClips.Add(originalName, newClip);
+            ReplaceAudioClipInternal(originalName, newClip, chance, string.Empty);
         }
 
         public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance)
         {
-            if (originalClip == null)
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or original clip's name is empty! This is not allowed.");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
                 return;
             }
 
-            ReplaceAudioClip(originalClip.GetName(), newClip, chance);
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, chance, string.Empty);
         }
 
         public static void ReplaceAudioClip(string originalName, AudioClip newClip, string source)
         {
             if (string.IsNullOrEmpty(originalName))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
                 return;
             }
             if (newClip == null)
@@ -673,128 +396,15 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
                 return;
             }
-            if (string.IsNullOrEmpty(source))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without allowed audio source specified! This is not allowed.");
-                return;
-            }
 
-            string finalName = originalName;
-            string clipName = newClip.GetName();
-            string tag = string.Empty;
-            float chance = 100f;
-
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
-            {
-                string[] parts = clipName.Split('-');
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    bool isNumeric = int.TryParse(parts[i], out _);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                    if (!isNumeric && !parts[i].Contains('_'))
-                    {
-                        tag = parts[i];
-                    }
-                }
-
-                if (parts.Length > 1)
-                {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({secondLastPart.Substring(1)}) but you're using the manual function to assign it's source. ({source}) The file name will be ignored.");
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        chance = parsedChance * 0.01f;
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({lastPart.Substring(1)}) but you're using the manual function to assign it's source. ({source}) The file name will be ignored.");
-                        }
-                    }
-
-                    clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
-                }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
-
-            if (!string.IsNullOrEmpty(source))
-            {
-                finalName = $"{originalName}#{source}";
-            }
-
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
-
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
-
-            // If the clipName already exists in the dictionary, add the new audio clip with its chance
-            if (replacedClips.ContainsKey(finalName))
-            {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
-            }
-            // If the clipName doesn't exist, create a new entry in the dictionary
-            else
-            {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
-            }
-
-            float totalChance = 0;
-
-            for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-            {
-                totalChance += replacedClips[finalName].clips[i].chance;
-            }
-
-            int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
-
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
-            }
-            else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
-
-            //replacedClips.Add(originalName, newClip);
+            ReplaceAudioClipInternal(originalName, newClip, 1f, source);
         }
 
         public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, string source)
         {
-            if (originalClip == null)
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or original clip's name is empty! This is not allowed.");
                 return;
             }
             if (newClip == null)
@@ -803,268 +413,197 @@ namespace LCSoundTool
                 return;
             }
 
-            ReplaceAudioClip(originalClip.GetName(), newClip, source);
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, 1f, source);
         }
 
         public static void ReplaceAudioClip(string originalName, AudioClip newClip, string[] source)
         {
-            string finalSource = string.Empty;
-
-            if (source != null && source.Length > 0)
-            {
-                for (int i = 0; i < source.Length; i++)
-                {
-                    if (!string.IsNullOrEmpty(source[i]))
-                        finalSource = $"{finalSource},{source[i]}";
-                }
-            }
-
             if (string.IsNullOrEmpty(originalName))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-            if (string.IsNullOrEmpty(finalSource))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without allowed audio source specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
                 return;
             }
 
-            string finalName = originalName;
-            string clipName = newClip.GetName();
-            string tag = string.Empty;
-            float chance = 100f;
+            List<string> sourceList = source.ToList();
 
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
+            for (int i = 0; i < sourceList.Count; i++)
             {
-                string[] parts = clipName.Split('-');
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-                for (int i = 0; i < parts.Length; i++)
+                if (string.IsNullOrEmpty(sourceList[i]))
                 {
-                    bool isNumeric = int.TryParse(parts[i], out _);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                    if (!isNumeric && !parts[i].Contains('_'))
-                    {
-                        tag = parts[i];
-                    }
-                }
-
-                if (parts.Length > 1)
-                {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({secondLastPart.Substring(1)}) but you're using the manual function to assign it's source. ({finalSource}) The file name will be ignored.");
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        chance = parsedChance * 0.01f;
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({lastPart.Substring(1)}) but you're using the manual function to assign it's source. ({finalSource}) The file name will be ignored.");
-                        }
-                    }
-
-                    clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
+                    sourceList.RemoveAt(i);
+                    i--;
                 }
             }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
 
-            if (!string.IsNullOrEmpty(finalSource))
-            {
-                finalName = $"{originalName}#{finalSource}";
-            }
-
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
-
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
-
-            // If the clipName already exists in the dictionary, add the new audio clip with its chance
-            if (replacedClips.ContainsKey(finalName))
-            {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
-            }
-            // If the clipName doesn't exist, create a new entry in the dictionary
-            else
-            {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource, tag));
-            }
-
-            float totalChance = 0;
-
-            for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-            {
-                totalChance += replacedClips[finalName].clips[i].chance;
-            }
-
-            int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
-
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
-            }
-            else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
-
-            //replacedClips.Add(originalName, newClip);
+            ReplaceAudioClipInternal(originalName, newClip, 1f, string.Join(",", sourceList));
         }
 
         public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, string[] source)
         {
-            if (originalClip == null)
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or original clip's name is empty! This is not allowed.");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
                 return;
             }
+            
+            List<string> sourceList = source.ToList();
 
-            ReplaceAudioClip(originalClip.GetName(), newClip, source);
+            for (int i = 0; i < sourceList.Count; i++)
+            {
+                if (string.IsNullOrEmpty(sourceList[i]))
+                {
+                    sourceList.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, 1f, string.Join(",", sourceList));
         }
 
         public static void ReplaceAudioClip(string originalName, AudioClip newClip, float chance, string source)
         {
             if (string.IsNullOrEmpty(originalName))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
                 return;
             }
             if (newClip == null)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed");
                 return;
             }
-            if (string.IsNullOrEmpty(source))
+            if (chance < 0f || chance > 1f)
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without allowed audio source specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
                 return;
             }
 
+            ReplaceAudioClipInternal(originalName, newClip, chance, source);
+        }
+
+        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance, string source)
+        {
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or the specified original clip has no name! This is not allowed");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
+                return;
+            }
+
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, chance, source);
+        }
+
+        public static void ReplaceAudioClip(string originalName, AudioClip newClip, float chance, string[] source)
+        {
+            if (string.IsNullOrEmpty(originalName))
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
+                return;
+            }
+
+            List<string> sourceList = source.ToList();
+
+            for (int i = 0; i < sourceList.Count; i++)
+            {
+                if (string.IsNullOrEmpty(sourceList[i]))
+                {
+                    sourceList.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            ReplaceAudioClipInternal(originalName, newClip, chance, string.Join(",", sourceList));
+        }
+
+        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance, string[] source)
+        {
+            if (originalClip == null || string.IsNullOrEmpty(originalClip.GetName()))
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified or original clip's name is empty! This is not allowed.");
+                return;
+            }
+            if (newClip == null)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without new clip specified! This is not allowed.");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
+                return;
+            }
+
+            List<string> sourceList = source.ToList();
+
+            for (int i = 0; i < sourceList.Count; i++)
+            {
+                if (string.IsNullOrEmpty(sourceList[i]))
+                {
+                    sourceList.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            ReplaceAudioClipInternal(originalClip.GetName(), newClip, chance, string.Join(",", sourceList));
+        }
+
+        private static void ReplaceAudioClipInternal(string originalName, AudioClip newClip, float chance, string source)
+        {
             string finalName = originalName;
             string clipName = newClip.GetName();
-            string tag = string.Empty;
-
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
-            {
-                string[] parts = clipName.Split('-');
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    bool isNumeric = int.TryParse(parts[i], out _);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                    if (!isNumeric && !parts[i].Contains('_'))
-                    {
-                        tag = parts[i];
-                    }
-                }
-
-                if (parts.Length > 1)
-                {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({secondLastPart.Substring(1)}) but you're using the manual function to assign it's source. ({source}) The file name will be ignored.");
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        Instance.logger.LogDebug($"Clip {clipName} contains random chance specified in it's name ({parsedChance}%) but you're using the manual function to assign it's chance. ({Mathf.RoundToInt(chance * 100f)}%) The file name will be ignored.");
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({lastPart.Substring(1)}) but you're using the manual function to assign it's source. ({source}) The file name will be ignored.");
-                        }
-                    }
-
-                    clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
-                }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
 
             if (!string.IsNullOrEmpty(source))
             {
                 finalName = $"{originalName}#{source}";
             }
 
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
+            //if (replacedClips.ContainsKey(finalName) && chance >= 100f)
+            //{
+            //    Instance.logger.LogWarning($"Trying to replace an audio clip that already has been replaced with other clips with a new single clip that has 100% chance of playback! This is not allowed");
+            //    return;
+            //}
 
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
+            // Ensure the chance is within the valid range of 0 - 1.0
+            //chance = Mathf.Clamp01(chance);
 
             // If the clipName already exists in the dictionary, add the new audio clip with its chance
             if (replacedClips.ContainsKey(finalName))
             {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
+                replacedClips[finalName].AddClip(newClip, chance);
             }
             // If the clipName doesn't exist, create a new entry in the dictionary
             else
             {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source, tag));
+                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, source));
             }
 
             float totalChance = 0;
@@ -1076,203 +615,91 @@ namespace LCSoundTool
 
             int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
 
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
                 if (infoDebugging)
                     Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
-            }
-            else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
 
-            //replacedClips.Add(originalName, newClip);
-        }
-
-        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance, string source)
-        {
-            if (originalClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-            if (newClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-
-            ReplaceAudioClip(originalClip.GetName(), newClip, chance, source);
-        }
-
-        public static void ReplaceAudioClip(string originalName, AudioClip newClip, float chance, string[] source)
-        {
-            string finalSource = string.Empty;
-
-            if (source != null && source.Length > 0)
-            {
-                for (int i = 0; i < source.Length; i++)
-                {
-                    if (!string.IsNullOrEmpty(source[i]))
-                        finalSource = $"{finalSource},{source[i]}";
-                }
-            }
-
-            if (string.IsNullOrEmpty(originalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-            if (newClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-            if (string.IsNullOrEmpty(finalSource))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without allowed audio source specified! This is not allowed.");
-                return;
-            }
-
-            string finalName = originalName;
-            string clipName = newClip.GetName();
-            string tag = string.Empty;
-
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains('-'))
-            {
-                string[] parts = clipName.Split('-');
-
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} contains {parts.Length} parts in it's name.");
-
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    bool isNumeric = int.TryParse(parts[i], out _);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"-- (Part {i + 1}) string {parts[i]}, isNumeric {isNumeric}, isSourceName {parts[i].Contains('_')}");
-
-                    if (!isNumeric && !parts[i].Contains('_'))
-                    {
-                        tag = parts[i];
-                    }
-                }
-
-                if (parts.Length > 1)
-                {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({secondLastPart.Substring(1)}) but you're using the manual function to assign it's source. ({finalSource}) The file name will be ignored.");
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        Instance.logger.LogDebug($"Clip {clipName} contains random chance specified in it's name ({parsedChance}%) but you're using the manual function to assign it's chance. ({Mathf.RoundToInt(chance * 100f)}%) The file name will be ignored.");
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            Instance.logger.LogDebug($"Clip {clipName} contains source specified in it's name ({lastPart.Substring(1)}) but you're using the manual function to assign it's source. ({finalSource}) The file name will be ignored.");
-                        }
-                    }
-
-                    clipName = string.Join('-', parts, 0, parts.Length - 1);
-
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"ClipName after reparsing {clipName}");
-                }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
-            }
-
-            if (!string.IsNullOrEmpty(finalSource))
-            {
-                finalName = $"{originalName}#{finalSource}";
-            }
-
-            if (replacedClips.ContainsKey(finalName) && chance >= 100f)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip that already has been replaced with new clip that has 100% chance of playback! This is not allowed.");
-                return;
-            }
-
-            // Ensure the chance is within the valid range
-            chance = Mathf.Clamp01(chance);
-
-            // If the clipName already exists in the dictionary, add the new audio clip with its chance
-            if (replacedClips.ContainsKey(finalName))
-            {
-                replacedClips[finalName].AddClip(newClip, chance, tag);
-            }
-            // If the clipName doesn't exist, create a new entry in the dictionary
-            else
-            {
-                replacedClips.Add(finalName, new ReplacementAudioClip(newClip, chance, finalSource, tag));
-            }
-
-            float totalChance = 0;
-
-            for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-            {
-                totalChance += replacedClips[finalName].clips[i].chance;
-            }
-
-            int finalTotalChance = Mathf.RoundToInt(totalChance * 100f);
-
-            if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
-            }
-            else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
-            }
-
-            //replacedClips.Add(originalName, newClip);
-        }
-
-        public static void ReplaceAudioClip(AudioClip originalClip, AudioClip newClip, float chance, string[] source)
-        {
-            if (originalClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-            if (newClip == null)
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to replace an audio clip without new clip specified! This is not allowed.");
-                return;
-            }
-
-            ReplaceAudioClip(originalClip.GetName(), newClip, chance, source);
+            //if ((finalTotalChance < 100 || finalTotalChance > 100) && replacedClips[finalName].clips.Count() > 1)
+            //{
+            //    if (infoDebugging)
+            //        Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} does not equal 100%. Currently {finalTotalChance}% (at least yet?)");
+            //}
+            //else if (finalTotalChance == 100 && replacedClips[finalName].clips.Count() > 1)
+            //{
+            //    if (infoDebugging)
+            //        Instance.logger.LogDebug($"The current total combined chance for replaced {replacedClips[finalName].clips.Count()} random audio clips for audio clip {finalName} is equal to 100%");
+            //}
         }
 
         public static void RemoveRandomAudioClip(string name, float chance)
         {
             if (string.IsNullOrEmpty(name))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip without original clip specified! This is not allowed");
+                return;
+            }
+            if (!replacedClips.ContainsKey(name))
+            {
+                Instance.logger.LogWarning($"Trying to restore an audio clip that does not exist! This is not allowed");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to restore an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
+                return;
+            }
+
+            RemoveRandomAudioClipInternal(name, chance, string.Empty);
+        }
+
+        public static void RemoveRandomAudioClip(string name, float chance, string source)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                Instance.logger.LogWarning($"Trying to restore an audio clip without original clip specified! This is not allowed");
                 return;
             }
 
             if (!replacedClips.ContainsKey(name))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip that does not exist! This is not allowed");
                 return;
+            }
+
+            RemoveRandomAudioClipInternal(name, chance, source);
+        }
+
+        public static void RemoveRandomAudioClip(string name, float chance, string[] source)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip without original clip specified! This is not allowed");
+                return;
+            }
+            if (chance < 0f || chance > 1f)
+            {
+                Instance.logger.LogWarning($"Trying to replace an audio clip with an invalid chance of {chance}! Chance has to be between 0 - 1.0");
+                return;
+            }
+
+            List<string> sourceList = source.ToList();
+
+            for (int i = 0; i < sourceList.Count; i++)
+            {
+                if (string.IsNullOrEmpty(sourceList[i]))
+                {
+                    sourceList.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            RemoveRandomAudioClipInternal(name, chance, string.Join(",", sourceList));
+        }
+
+        private static void RemoveRandomAudioClipInternal(string name, float chance, string source)
+        {
+            if (!string.IsNullOrEmpty(source))
+            {
+                name = $"{name}#{source}";
             }
 
             if (chance > 0f)
@@ -1282,7 +709,7 @@ namespace LCSoundTool
                     if (replacedClips[name].clips[i].chance == chance)
                     {
                         replacedClips[name].clips.RemoveAt(i);
-                        
+
                         if (replacedClips[name].clips.Count <= 0)
                         {
                             Instance.logger.LogDebug($"Removed replaced AudioClip {name} completely as all of it's random clips have been removed.");
@@ -1294,251 +721,117 @@ namespace LCSoundTool
             }
         }
 
-        public static void RemoveRandomAudioClip(string name, string source, float chance)
-        {
-            string finalName = name;
-
-            if (!string.IsNullOrEmpty(finalName))
-            {
-                finalName = $"{name}#{source}";
-            }
-
-            if (string.IsNullOrEmpty(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-
-            if (!replacedClips.ContainsKey(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
-            }
-
-            if (chance > 0f)
-            {
-                for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-                {
-                    if (replacedClips[finalName].clips[i].chance == chance)
-                    {
-                        replacedClips[finalName].clips.RemoveAt(i);
-
-                        if (replacedClips[finalName].clips.Count <= 0)
-                        {
-                            Instance.logger.LogDebug($"Removed replaced AudioClip {finalName} completely as all of it's random clips have been removed.");
-                            replacedClips.Remove(finalName);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        public static void RemoveRandomAudioClip(string name, string[] source, float chance)
-        {
-            string finalName = name;
-            string finalSource = string.Empty;
-
-            if (source != null && source.Length > 0)
-            {
-                for (int i = 0; i < source.Length; i++)
-                {
-                    if (!string.IsNullOrEmpty(source[i]))
-                        finalSource = $"{finalSource},{source[i]}";
-                }
-            }
-
-            if (!string.IsNullOrEmpty(finalSource))
-            {
-                finalName = $"{name}#{finalSource}";
-            }
-
-            if (string.IsNullOrEmpty(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-
-            if (!replacedClips.ContainsKey(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
-            }
-
-            if (chance > 0f)
-            {
-                for (int i = 0; i < replacedClips[finalName].clips.Count(); i++)
-                {
-                    if (replacedClips[finalName].clips[i].chance == chance)
-                    {
-                        replacedClips[finalName].clips.RemoveAt(i);
-
-                        if (replacedClips[finalName].clips.Count <= 0)
-                        {
-                            Instance.logger.LogDebug($"Removed replaced AudioClip {finalName} completely as all of it's random clips have been removed.");
-                            replacedClips.Remove(finalName);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
         public static void RestoreAudioClip(string name)
         {
             if (string.IsNullOrEmpty(name))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip without original clip specified! This is not allowed");
                 return;
             }
-
             if (!replacedClips.ContainsKey(name))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip that does not exist! This is not allowed");
                 return;
             }
 
-            replacedClips.Remove(name);
+            RestoreAudioClipInternal(name, string.Empty);
         }
 
         public static void RestoreAudioClip(string name, string source)
         {
-            string finalName = name;
-
-            if (!string.IsNullOrEmpty(source))
+            if (string.IsNullOrEmpty(name))
             {
-                finalName = $"{name}#{source}";
+                Instance.logger.LogWarning($"Trying to restore an audio clip without original clip specified! This is not allowed");
+                return;
             }
-
-            if (string.IsNullOrEmpty(finalName))
+            if (!replacedClips.ContainsKey(name))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip that does not exist! This is not allowed");
                 return;
             }
 
-            if (!replacedClips.ContainsKey(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
-            }
-
-            replacedClips.Remove(finalName);
+            RestoreAudioClipInternal(name, source);
         }
 
         public static void RestoreAudioClip(string name, string[] source)
         {
-            string finalName = name;
-            string finalSource = string.Empty;
-
-            if (source != null && source.Length > 0)
+            if (string.IsNullOrEmpty(name))
             {
-                for (int i = 0; i < source.Length; i++)
+                Instance.logger.LogWarning($"Trying to restore an audio clip without original clip specified! This is not allowed");
+                return;
+            }
+            if (!replacedClips.ContainsKey(name))
+            {
+                Instance.logger.LogWarning($"Trying to restore an audio clip that does not exist! This is not allowed");
+                return;
+            }
+
+            List<string> sourceList = source.ToList();
+
+            for (int i = 0; i < sourceList.Count; i++)
+            {
+                if (string.IsNullOrEmpty(sourceList[i]))
                 {
-                    if (!string.IsNullOrEmpty(source[i]))
-                        finalSource = $"{finalSource},{source[i]}";
+                    sourceList.RemoveAt(i);
+                    i--;
                 }
             }
 
-            if (!string.IsNullOrEmpty(finalSource))
-            {
-                finalName = $"{name}#{finalSource}";
-            }
-
-            if (string.IsNullOrEmpty(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without original clip specified! This is not allowed.");
-                return;
-            }
-
-            if (!replacedClips.ContainsKey(finalName))
-            {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
-            }
-
-            replacedClips.Remove(finalName);
+            RestoreAudioClipInternal(name, string.Join(",", sourceList));
         }
 
         public static void RestoreAudioClip(AudioClip clip)
         {
-            if (clip == null)
+            if (clip == null || string.IsNullOrEmpty(clip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without vanilla clip name specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip without vanilla clip specified or specified clip's name is empty! This is not allowed");
                 return;
             }
 
-            RestoreAudioClip(clip.GetName());
+            RestoreAudioClipInternal(clip.GetName(), string.Empty);
         }
 
-        public static void RestoreAudioClip(string name, AudioClip replacementClip)
+        public static void RestoreAudioClip(AudioClip clip, string source)
         {
-            if (replacementClip == null)
+            if (clip == null || string.IsNullOrEmpty(clip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without replacement clip specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip without vanilla clip specified or specified clip's name is empty! This is not allowed");
                 return;
             }
 
-            if (string.IsNullOrEmpty(name))
+            RestoreAudioClipInternal(clip.GetName(), source);
+        }
+
+        public static void RestoreAudioClip(AudioClip clip, string[] source)
+        {
+            if (clip == null || string.IsNullOrEmpty(clip.GetName()))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip without vanilla clip name specified! This is not allowed.");
+                Instance.logger.LogWarning($"Trying to restore an audio clip without vanilla clip specified or specified clip's name is empty! This is not allowed");
                 return;
             }
 
-            // -V- This section is just copied from the clip replacement function -V-
+            List<string> sourceList = source.ToList();
 
-            string clipName = replacementClip.GetName();
-            string source = string.Empty;
-            float chance = 0f;
-
-            // If clipName contains "-number" or/and "-source", parse the chance and audio source name
-            if (clipName.Contains("-"))
+            for (int i = 0; i < sourceList.Count; i++)
             {
-                string[] parts = clipName.Split('-');
-                if (parts.Length > 1)
+                if (string.IsNullOrEmpty(sourceList[i]))
                 {
-                    if (parts.Length > 2)
-                    {
-                        string secondLastPart = parts[parts.Length - 2];
-                        if (!string.IsNullOrEmpty(secondLastPart) && secondLastPart.StartsWith("_"))
-                        {
-                            source = secondLastPart.Substring(1);
-                        }
-                    }
-
-                    string lastPart = parts[parts.Length - 1];
-
-                    if (int.TryParse(lastPart, out int parsedChance))
-                    {
-                        chance = parsedChance * 0.01f;
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(lastPart) && lastPart.StartsWith("_"))
-                        {
-                            source = lastPart.Substring(1);
-                        }
-                    }
-
-                    clipName = string.Join("-", parts, 0, parts.Length - 1);
-                }
-                else
-                {
-                    if (infoDebugging)
-                        Instance.logger.LogDebug($"Clip {clipName} does not contain a '-' character for source name or chance");
+                    sourceList.RemoveAt(i);
+                    i--;
                 }
             }
 
-            // -/\- This section is just copied from the clip replacement function -/\-
+            RestoreAudioClipInternal(clip.GetName(), string.Join(",", sourceList));
+        }
 
-            string constructedName = $"{name}#{source}";
-
-            if (!replacedClips.ContainsKey(constructedName))
+        private static void RestoreAudioClipInternal(string name, string source)
+        {
+            if (!string.IsNullOrEmpty(source))
             {
-                Instance.logger.LogWarning($"Plugin {PLUGIN_GUID} is trying to restore an audio clip that does not exist! This is not allowed.");
-                return;
+                name = $"{name}#{source}";
             }
 
-            RestoreAudioClip(constructedName);
+            replacedClips.Remove(name);
         }
         #endregion
 
@@ -1551,78 +844,6 @@ namespace LCSoundTool
         public static AudioClip GetAudioClip(string modFolder, string subFolder, string soundName)
         {
             AudioType audioType = AudioType.wav;
-            bool tryLoading = true;
-            bool skipLegacyCheck = false;
-            string legacy = " ";
-
-            // path stuff
-            var path = Path.Combine(Paths.PluginPath, modFolder, subFolder, soundName);
-            var pathOmitSubDir = Path.Combine(Paths.PluginPath, modFolder, soundName);
-            var pathDir = Path.Combine(Paths.PluginPath, modFolder, subFolder);
-
-            var pathLegacy = Path.Combine(Paths.PluginPath, subFolder, soundName);
-            var pathDirLegacy = Path.Combine(Paths.PluginPath, subFolder);
-
-            // check if file and directory are valid, else skip loading
-            if (!Directory.Exists(pathDir))
-            {
-                if (!string.IsNullOrEmpty(subFolder))
-                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder}/{subFolder} does not exist!");
-                else
-                {
-                    Instance.logger.LogWarning($"Requested directory at BepInEx/Plugins/{modFolder} does not exist!");
-                    if (!modFolder.Contains("-"))
-                        Instance.logger.LogWarning($"This sound mod might not be compatable with mod managers. You should contact the sound mod's author.");
-                }
-                //Directory.CreateDirectory(pathDir);
-                tryLoading = false;
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug("Skipping legacy path check...");
-                skipLegacyCheck = true;
-            }
-            if (!File.Exists(path))
-            {
-                Instance.logger.LogWarning($"Requested audio file does not exist at path {path}!");
-                tryLoading = false;
-
-                Instance.logger.LogDebug($"Looking for audio file from mod root instead at {pathOmitSubDir}...");
-                if (File.Exists(pathOmitSubDir))
-                {
-                    Instance.logger.LogDebug($"Found audio file at path {pathOmitSubDir}!");
-                    path = pathOmitSubDir;
-                    tryLoading = true;
-                    if (infoDebugging)
-                        Instance.logger.LogDebug("Skipping legacy path check...");
-                    skipLegacyCheck = true;
-                }
-                else
-                {
-                    Instance.logger.LogWarning($"Requested audio file does not exist at mod root path {pathOmitSubDir}!");
-                }
-            }
-            else
-            {
-                if (infoDebugging)
-                    Instance.logger.LogDebug("Skipping legacy path check...");
-                skipLegacyCheck = true;
-            }
-            if (Directory.Exists(pathDirLegacy) && !skipLegacyCheck)
-            {
-                if (!string.IsNullOrEmpty(subFolder))
-                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins/{subFolder} found!");
-                else if (!modFolder.Contains("-"))
-                    Instance.logger.LogWarning($"Legacy directory location at BepInEx/Plugins found!");
-            }
-            if (File.Exists(pathLegacy) && !skipLegacyCheck)
-            {
-                Instance.logger.LogWarning($"Legacy path contains the requested audio file at path {pathLegacy}!");
-                legacy = " legacy ";
-                path = pathLegacy;
-                tryLoading = true;
-            }
 
             string[] parts = soundName.Split('.');
             if (parts[parts.Length - 1].ToLower().Contains("wav"))
@@ -1649,129 +870,7 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Failed to detect file type of a sound file! This may cause issues with other mod functionality. Sound defaulted to WAV. Sound: {soundName}");
             }
 
-            AudioClip result = null;
-
-            if (tryLoading)
-            {
-                Instance.logger.LogDebug($"Loading AudioClip {soundName} from{legacy}path: {path}");
-
-                switch (audioType)
-                {
-                    case AudioType.wav:
-                        result = WavUtility.LoadFromDiskToAudioClip(path);
-                        break;
-                    case AudioType.ogg:
-                        result = OggUtility.LoadFromDiskToAudioClip(path);
-                        break;
-                    case AudioType.mp3:
-                        result = Mp3Utility.LoadFromDiskToAudioClip(path);
-                        break;
-                }
-
-                Instance.logger.LogDebug($"Finished loading AudioClip {soundName} with length of {result.length}!");
-            }
-            else
-            {
-                Instance.logger.LogWarning($"Failed to load AudioClip {soundName} from invalid{legacy}path at {path}!");
-            }
-
-            // Workaround to ensure the clip always gets named because for some reason Unity doesn't always get the name and leaves it blank sometimes???
-            if (string.IsNullOrEmpty(result.GetName()))
-            {
-                string finalName = string.Empty;
-                string[] nameParts = new string[0];
-
-                switch (audioType)
-                {
-                    case AudioType.wav:
-
-                        finalName = soundName.Replace(".wav", "");
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
-
-                        nameParts = finalName.Split('/');
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
-
-                        if (nameParts.Length <= 1)
-                        {
-                            nameParts = finalName.Split('\\');
-                        }
-
-                        finalName = nameParts[nameParts.Length - 1];
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
-
-                        result.name = finalName;
-                        break;
-                    case AudioType.ogg:
-                        finalName = soundName.Replace(".ogg", "");
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
-
-                        nameParts = finalName.Split('/');
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
-
-                        if (nameParts.Length <= 1)
-                        {
-                            nameParts = finalName.Split('\\');
-                        }
-
-                        finalName = nameParts[nameParts.Length - 1];
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"finalName from nameParts array {finalName}");
-
-                        result.name = finalName;
-                        break;
-                    case AudioType.mp3:
-                        finalName = soundName.Replace(".mp3", "");
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"soundName {soundName}, finalName {finalName}");
-
-                        nameParts = finalName.Split('/');
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
-
-                        if (nameParts.Length <= 1)
-                        {
-                            nameParts = finalName.Split('\\');
-                        }
-
-                        finalName = nameParts[nameParts.Length - 1];
-
-                        if (infoDebugging)
-                            Instance.logger.LogDebug($"nameParts length {nameParts.Length}");
-
-                        result.name = finalName;
-                        break;
-                }
-            }
-
-            if (result != null)
-            {
-                string clipName = result.GetName();
-
-                if (clipTypes.ContainsKey(clipName))
-                {
-                    clipTypes[clipName] = audioType;
-                }
-                else
-                {
-                    clipTypes.Add(clipName, audioType);
-                }
-            }
-
-            // return the clip we got
-            return result;
+            return GetAudioClip(modFolder, subFolder, soundName, audioType);
         }
 
         public static AudioClip GetAudioClip(string modFolder, string soundName, AudioType audioType)
@@ -1883,13 +982,13 @@ namespace LCSoundTool
                 switch (audioType)
                 {
                     case AudioType.wav:
-                        result = WavUtility.LoadFromDiskToAudioClip(path);
+                        result = AudioUtility.LoadFromDiskToAudioClip(path, UnityEngine.AudioType.WAV);
                         break;
                     case AudioType.ogg:
-                        result = OggUtility.LoadFromDiskToAudioClip(path);
+                        result = AudioUtility.LoadFromDiskToAudioClip(path, UnityEngine.AudioType.OGGVORBIS);
                         break;
                     case AudioType.mp3:
-                        result = Mp3Utility.LoadFromDiskToAudioClip(path);
+                        result = AudioUtility.LoadFromDiskToAudioClip(path, UnityEngine.AudioType.MPEG);
                         break;
                 }
 
@@ -1985,14 +1084,14 @@ namespace LCSoundTool
             {
                 string clipName = result.GetName();
 
-                if (clipTypes.ContainsKey(clipName))
-                {
-                    clipTypes[clipName] = audioType;
-                }
-                else
-                {
-                    clipTypes.Add(clipName, audioType);
-                }
+                //if (clipTypes.ContainsKey(clipName))
+                //{
+                //    clipTypes[clipName] = audioType;
+                //}
+                //else
+                //{
+                //    clipTypes.Add(clipName, audioType);
+                //}
             }
 
             // return the clip we got
@@ -2008,36 +1107,18 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Networking disabled! Failed to send {audioClip}!");
                 return;
             }
-
             if (audioClip == null)
             {
                 Instance.logger.LogWarning($"audioClip variable of SendAudioClip not assigned! Failed to send {audioClip}!");
                 return;
             }
-
             if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
                 Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send {audioClip}! If you're sending things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
                 return;
             }
 
-            string clipName = audioClip.GetName();
-
-            if (clipTypes.ContainsKey(clipName))
-            {
-                if (clipTypes[clipName] == AudioType.ogg)
-                {
-                    NetworkHandler.Instance.SendAudioClipServerRpc(clipName, OggUtility.AudioClipToByteArray(audioClip, out float[] samplesOgg));
-                    return;
-                }
-                else if (clipTypes[clipName] == AudioType.mp3)
-                {
-                    NetworkHandler.Instance.SendAudioClipServerRpc(clipName, Mp3Utility.AudioClipToByteArray(audioClip, out float[] samplesMp3));
-                    return;
-                }
-            }
-
-            NetworkHandler.Instance.SendAudioClipServerRpc(clipName, WavUtility.AudioClipToByteArray(audioClip, out float[] samplesWav));
+            NetworkHandler.Instance.SendAudioClipServerRpc(audioClip.GetName(), AudioUtility.AudioClipToByteArray(audioClip, out float[] samples), audioClip.channels, audioClip.frequency);
         }
 
         public static void RemoveNetworkedAudioClip(AudioClip audioClip)
@@ -2052,13 +1133,11 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Networking disabled! Failed to remove {audioClip}!");
                 return;
             }
-
             if (string.IsNullOrEmpty(audioClip))
             {
                 Instance.logger.LogWarning($"audioClip variable of RemoveAudioClip not assigned! Failed to remove {audioClip}!");
                 return;
             }
-
             if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
                 Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to remove {audioClip}! If you're removing things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
@@ -2075,7 +1154,6 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Networking disabled! Failed to sync audio clips!");
                 return;
             }
-
             if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
                 Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to sync networked audio! If you're syncing things in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked audio runs only after the player setups a networked connection!");
@@ -2092,7 +1170,6 @@ namespace LCSoundTool
                 Instance.logger.LogWarning($"Networking disabled! Failed to send Unity random seed!");
                 return;
             }
-
             if (Instance == null || GameNetworkManagerPatch.networkHandlerHost == null || NetworkHandler.Instance == null)
             {
                 Instance.logger.LogWarning($"Instance of SoundTool not found or networking has not finished initializing. Failed to send Unity Random seed! If you're sending the seed in Awake or in a scene such as the main menu it might be too early, please try some of the other built-in Unity methods and make sure your networked methods run only after the player setups a networked connection!");
@@ -2100,6 +1177,91 @@ namespace LCSoundTool
             }
 
             NetworkHandler.Instance.SendSeedToClientsServerRpc(seed);
+        }
+        #endregion
+
+        #region LOGGING METHODS
+        public void ToggleDebug()
+        {
+            debugAudioSources = !debugAudioSources;
+            if (indepthDebugging && !debugAudioSources)
+                indepthDebugging = false;
+            Instance.logger.LogDebug($"Toggling AudioSource debug logs {debugAudioSources}!");
+        }
+
+        public void ToggleIndepthDebug()
+        {
+            debugAudioSources = !debugAudioSources;
+            indepthDebugging = debugAudioSources;
+            infoDebugging = debugAudioSources;
+            Instance.logger.LogDebug($"Toggling in-depth AudioSource debug logs {debugAudioSources}!");
+        }
+
+        public void ToggleInfoDebug()
+        {
+            infoDebugging = !infoDebugging;
+            Instance.logger.LogDebug($"Toggling informational debug logs {infoDebugging}!");
+        }
+
+        public void PrintAllReplacedSounds()
+        {
+            Instance.logger.LogDebug($" ");
+            Instance.logger.LogDebug($"Printing all currently replaced sounds...");
+            Instance.logger.LogDebug($" ");
+
+            string[] keys = replacedClips.Keys.ToArray();
+
+            for (int i = 0; i < replacedClips.Count; i++)
+            {
+                ReplacementAudioClip rClip = replacedClips[keys[i]];
+
+                Instance.logger.LogDebug($"Clip named {keys[i]} with {rClip.clips.Count} replacement clip(s)");
+                Instance.logger.LogDebug($"- Clip can play? {rClip.canPlay}");
+                Instance.logger.LogDebug($"- Clip audio source(s)? {rClip.source}");
+                Instance.logger.LogDebug($"- All {rClip.clips.Count} clip(s):");
+                for (int k = 0; k < rClip.clips.Count; k++)
+                {
+                    Instance.logger.LogDebug($"-- Clip {k + 1} - {rClip.clips[k].clip.GetName()} with chance of {Mathf.RoundToInt(rClip.clips[k].chance * 100f)}%");
+                }
+                Instance.logger.LogDebug($"-- Total - All clips combined chance {Mathf.RoundToInt(rClip.TotalChance() * 100f)}%");
+            }
+            Instance.logger.LogDebug($" ");
+            Instance.logger.LogDebug($"Finished printing all currently replaced sounds!");
+            Instance.logger.LogDebug($" ");
+        }
+
+        private void PrintAllCurrentSounds()
+        {
+            Instance.logger.LogDebug($" ");
+            Instance.logger.LogDebug($"Printing all sounds in currently loaded scenes...");
+            Instance.logger.LogDebug($" ");
+
+            AudioSource[] sources = FindObjectsOfType<AudioSource>(true);
+
+            for (int i = 0; i < sources.Length; i++)
+            {
+                Instance.logger.LogDebug($"AudioSource {sources[i]} with clip {sources[i].clip}");
+                Instance.logger.LogDebug($"- Volume: {sources[i].volume}");
+                Instance.logger.LogDebug($"- Priority: {sources[i].priority}");
+                Instance.logger.LogDebug($"- Plays on awake? {sources[i].playOnAwake}");
+                Instance.logger.LogDebug($"- Loops? {sources[i].loop}");
+                Instance.logger.LogDebug($"- Needs custom LCSoundTool component? {sources[i].playOnAwake}");
+                Instance.logger.LogDebug($"- Contains custom LCSoundTool component? {sources[i].transform.TryGetComponent(out AudioSourceExtension e)}");
+                Instance.logger.LogDebug($"- Used by PlayAudioAnimationEvent component? {sources[i].UsedByAnimationEventScript()}");
+                Instance.logger.LogDebug($"- Located in Scene: {sources[i].gameObject.scene}");
+                Instance.logger.LogDebug($"- Located on the following GameObject:");
+                Transform current = sources[i].transform;
+                Instance.logger.LogDebug($"-- (This) {current}");
+                while (current != sources[i].transform.root)
+                {
+                    current = current.parent;
+                    Instance.logger.LogDebug($"-- {current}");
+                }
+            }
+
+            Instance.logger.LogDebug($" ");
+            Instance.logger.LogDebug($"Finished printing all sounds in currently loaded scenes!");
+            Instance.logger.LogDebug($" ");
         }
         #endregion
     }

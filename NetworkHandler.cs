@@ -32,7 +32,7 @@ namespace LCSoundTool.Networking
         }
 
         [ClientRpc]
-        public void ReceiveAudioClipClientRpc(string clipName, byte[] audioData)
+        public void ReceiveAudioClipClientRpc(string clipName, byte[] audioData, int channels, int frequency)
         {
             // Check if the key (clipName) already exists in the dictionary
             if (!networkedAudioClips.ContainsKey(clipName))
@@ -40,20 +40,7 @@ namespace LCSoundTool.Networking
                 AudioClip newAudioClip = null;
 
                 // If it doesn't exist, create a new AudioClip and add it to the dictionary
-                if (SoundTool.clipTypes.ContainsKey(clipName))
-                {
-                    if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.ogg)
-                    {
-                        newAudioClip = OggUtility.ByteArrayToAudioClip(audioData, clipName);
-                    }
-                    else if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.mp3)
-                    {
-                        newAudioClip = Mp3Utility.ByteArrayToAudioClip(audioData, clipName);
-                    }
-                }
-
-                if (newAudioClip == null)
-                    newAudioClip = WavUtility.ByteArrayToAudioClip(audioData, clipName);
+                newAudioClip = AudioUtility.ByteArrayToAudioClip(audioData, clipName, channels, frequency);
 
                 networkedAudioClips.Add(clipName, newAudioClip);
                 ClientNetworkedAudioChanged?.Invoke();
@@ -78,16 +65,11 @@ namespace LCSoundTool.Networking
         }
 
         [ClientRpc]
-        public void SyncAudioClipsClientRpc(Strings clipNames)
+        public void SyncAudioClipsClientRpc(string clipName)
         {
-            string[] names = clipNames.MyStrings;
-
-            for (int i = 0; i < names.Length; i++)
+            if (!networkedAudioClips.ContainsKey(clipName))
             {
-                if (!networkedAudioClips.ContainsKey(names[i]))
-                {
-                    SendExistingAudioClipServerRpc(names[i]);
-                }
+                SendExistingAudioClipServerRpc(clipName);
             }
         }
 
@@ -99,9 +81,9 @@ namespace LCSoundTool.Networking
         }
 
         [ServerRpc(RequireOwnership = false)]
-        public void SendAudioClipServerRpc(string clipName, byte[] audioData)
+        public void SendAudioClipServerRpc(string clipName, byte[] audioData, int channels, int frequency)
         {
-            ReceiveAudioClipClientRpc(clipName, audioData);
+            ReceiveAudioClipClientRpc(clipName, audioData, channels, frequency);
             HostNetworkedAudioChanged?.Invoke();
         }
 
@@ -115,15 +97,18 @@ namespace LCSoundTool.Networking
         [ServerRpc(RequireOwnership = false)]
         public void SyncAudioClipsServerRpc()
         {
-            Strings clipNames = new Strings(networkedAudioClips.Keys.ToArray());
+            string[] clipNames = networkedAudioClips.Keys.ToArray();
 
-            if (clipNames.MyStrings.Length < 1)
+            if (clipNames.Length < 1)
             {
                 SoundTool.Instance.logger.LogDebug("No sounds found in networkedClips. Syncing process cancelled!");
                 return;
             }
 
-            SyncAudioClipsClientRpc(clipNames);
+            for (int i = 0; i < clipNames.Length; i++)
+            {
+                SyncAudioClipsClientRpc(clipNames[i]);
+            }
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -133,22 +118,9 @@ namespace LCSoundTool.Networking
             {
                 byte[] clipData = null;
 
-                if (SoundTool.clipTypes.ContainsKey(clipName))
-                {
-                    if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.ogg)
-                    {
-                        clipData = OggUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesOgg);
-                    }
-                    else if (SoundTool.clipTypes[clipName] == SoundTool.AudioType.mp3)
-                    {
-                        clipData = Mp3Utility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesMp3);
-                    }
-                }
+                clipData = AudioUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samples);
 
-                if (clipData == null)
-                    clipData = WavUtility.AudioClipToByteArray(networkedAudioClips[clipName], out float[] samplesWav);
-
-                ReceiveAudioClipClientRpc(clipName, clipData);
+                ReceiveAudioClipClientRpc(clipName, clipData, networkedAudioClips[clipName].channels, networkedAudioClips[clipName].frequency);
             }
             else
             {

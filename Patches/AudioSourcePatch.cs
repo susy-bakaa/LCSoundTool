@@ -191,6 +191,9 @@ namespace LCSoundTool.Patches
         #region DYNAMIC CLIP REPLACEMENT METHODS
         private static void RunDynamicClipReplacement(AudioSource instance)
         {
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"instance {instance} instance.clip {instance.clip}");
+
             if (instance == null || instance.clip == null) 
                 return;
 
@@ -198,14 +201,21 @@ namespace LCSoundTool.Patches
             string clipName;
             bool replaceClip = true;
 
-            if (originalClips.TryGetValue(sourceName, out AudioClip originalClip))
-            {
-                clipName = originalClip.GetName();
-            }
-            else
-            {
-                clipName = instance.clip.GetName();
-            }
+            //if (originalClips.TryGetValue(sourceName, out AudioClip originalClip))
+            //{
+            //    clipName = originalClip.GetName();
+            //    if (SoundTool.infoDebugging)
+            //        SoundTool.Instance.logger.LogDebug($"originalClips contained sourceName");
+            //}
+            //else
+            //{
+            clipName = instance.clip.GetName();
+            //if (SoundTool.infoDebugging)
+            //    SoundTool.Instance.logger.LogDebug($"originalClips did not contain sourceName");
+            //}
+
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"sourceName {instance.gameObject.name} clipName {clipName} replaceClip {replaceClip}");
 
             string finalName = clipName;
 
@@ -221,7 +231,10 @@ namespace LCSoundTool.Patches
 
                         if (splitName.Length == 2)
                         {
-                            if (splitName[1].Contains(instance.gameObject.name))
+                            //if (SoundTool.infoDebugging)
+                            //    SoundTool.Instance.logger.LogDebug($"splitName[0] {splitName[0]} splitName[1] {splitName[1]}");
+
+                            if (splitName[0].Contains(clipName) && splitName[1].Contains(instance.gameObject.name))
                             {
                                 finalName = $"{clipName}#{splitName[1]}";
                             }
@@ -230,23 +243,39 @@ namespace LCSoundTool.Patches
                 }
             }
 
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"finalName after splitName operation {finalName}");
+
             // Check if clipName exists in the dictionary
             if (SoundTool.replacedClips.ContainsKey(finalName))
             {
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replacedClips contained finalName");
+
                 if (!SoundTool.replacedClips[finalName].canPlay)
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].canPlay {SoundTool.replacedClips[finalName].canPlay}");
                     return;
                 }
 
                 if (!originalClips.ContainsKey(sourceName))
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"originalClips did not contain sourceName, adding sourceName {sourceName}");
                     originalClips.Add(sourceName, instance.clip);
                 }
 
                 if (!string.IsNullOrEmpty(SoundTool.replacedClips[finalName].source))
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].source {SoundTool.replacedClips[finalName].source} was not null or empty");
+
                     replaceClip = false;
                     string[] sources = SoundTool.replacedClips[finalName].source.Split(',');
+
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"sources array {sources.Length} {sources}");
 
                     if (instance != null && instance.gameObject.name != null)
                     {
@@ -256,7 +285,14 @@ namespace LCSoundTool.Patches
                             {
                                 if (sources[i] == instance.gameObject.name)
                                 {
+                                    if (SoundTool.infoDebugging)
+                                        SoundTool.Instance.logger.LogDebug($"sources[i] {sources[i]} matches instance.gameObject.name {instance.gameObject.name}");
                                     replaceClip = true;
+                                }
+                                else
+                                {
+                                    if (SoundTool.infoDebugging)
+                                        SoundTool.Instance.logger.LogDebug($"sources[i] {sources[i]} does not match instance.gameObject.name {instance.gameObject.name}");
                                 }
                             }
                         }
@@ -264,11 +300,26 @@ namespace LCSoundTool.Patches
                         {
                             if (sources[0] == instance.gameObject.name)
                             {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"sources[0] {sources[0]} matches instance.gameObject.name {instance.gameObject.name}");
                                 replaceClip = true;
+                            }
+                            else
+                            {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"sources[0] {sources[0]} does not match instance.gameObject.name {instance.gameObject.name}");
                             }
                         }
                     }
                 }
+                else
+                {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].source was empty or null '{SoundTool.replacedClips[finalName].source}'");
+                }
+
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replaceClip {replaceClip}");
 
                 List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[finalName].clips;
 
@@ -278,6 +329,9 @@ namespace LCSoundTool.Patches
                 {
                     totalChance += rc.chance;
                 }
+
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"totalChance {totalChance}");
 
                 // Generate a random value between 0 and totalChance
                 float randomValue = UnityEngine.Random.Range(0f, totalChance);
@@ -290,13 +344,19 @@ namespace LCSoundTool.Patches
                         // Return the chosen audio clip if allowed, otherwise revert it to vanilla and return the vanilla sound instead.
                         if (replaceClip)
                         {
+                            if (SoundTool.infoDebugging)
+                                SoundTool.Instance.logger.LogDebug($"clip replaced with {rc.clip}");
                             instance.clip = rc.clip;
                             return;
                         }
                         else
                         {
+                            if (SoundTool.infoDebugging)
+                                SoundTool.Instance.logger.LogDebug($"clip was not replaced with {rc.clip}");
                             if (originalClips.ContainsKey(sourceName))
                             {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"originalClips.ContainsKey(sourceName), clip was restored to {originalClips[sourceName]}");
                                 instance.clip = originalClips[sourceName];
                                 originalClips.Remove(sourceName);
                                 return;
@@ -312,14 +372,21 @@ namespace LCSoundTool.Patches
             // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
             else if (originalClips.ContainsKey(sourceName))
             {
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replacedClips did not contain finalName but originalClips contained sourceName");
                 instance.clip = originalClips[sourceName];
                 originalClips.Remove(sourceName);
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"clip was restored to {originalClips[sourceName]}");
                 return;
             }
         }
 
         private static AudioClip ReplaceClipWithNew(AudioClip original, AudioSource source = null)
         {
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"original {original} source {source}");
+
             if (original == null) 
                 return original;
 
@@ -327,6 +394,9 @@ namespace LCSoundTool.Patches
             bool replaceClip = true;
 
             string finalName = clipName;
+
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"sourceName {source.gameObject.name} clipName {clipName} replaceClip {replaceClip}");
 
             if (source != null)
             {
@@ -342,7 +412,7 @@ namespace LCSoundTool.Patches
 
                             if (splitName.Length == 2)
                             {
-                                if (splitName[1].Contains(source.gameObject.name))
+                                if (splitName[0].Contains(clipName) && splitName[1].Contains(source.gameObject.name))
                                 {
                                     finalName = $"{clipName}#{splitName[1]}";
                                 }
@@ -351,24 +421,45 @@ namespace LCSoundTool.Patches
                     }
                 }
             }
+            else
+            {
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"source was null, this means we can't check for sourceName for this sound!");
+            }
+
+            if (SoundTool.infoDebugging)
+                SoundTool.Instance.logger.LogDebug($"finalName after splitName operation {finalName}");
 
             // Check if clipName exists in the dictionary
             if (SoundTool.replacedClips.ContainsKey(finalName))
             {
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replacedClips contained finalName");
+
                 if (!SoundTool.replacedClips[finalName].canPlay)
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].canPlay {SoundTool.replacedClips[finalName].canPlay}");
                     return original;
                 }
 
                 if (!originalClips.ContainsKey(finalName))
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"originalClips did not contain finalName, adding finalName {finalName}");
                     originalClips.Add(finalName, original);
                 }
 
                 if (!string.IsNullOrEmpty(SoundTool.replacedClips[finalName].source))
                 {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].source {SoundTool.replacedClips[finalName].source} was not null or empty");
+
                     replaceClip = false;
                     string[] sources = SoundTool.replacedClips[finalName].source.Split(',');
+
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"sources array {sources.Length} {sources}");
 
                     if (source != null && source.gameObject.name != null)
                     {
@@ -378,7 +469,14 @@ namespace LCSoundTool.Patches
                             {
                                 if (sources[i] == source.gameObject.name)
                                 {
+                                    if (SoundTool.infoDebugging)
+                                        SoundTool.Instance.logger.LogDebug($"sources[i] {sources[i]} matches instance.gameObject.name {source.gameObject.name}");
                                     replaceClip = true;
+                                }
+                                else
+                                {
+                                    if (SoundTool.infoDebugging)
+                                        SoundTool.Instance.logger.LogDebug($"sources[i] {sources[i]} does not match instance.gameObject.name {source.gameObject.name}");
                                 }
                             }
                         }
@@ -386,11 +484,26 @@ namespace LCSoundTool.Patches
                         {
                             if (sources[0] == source.gameObject.name)
                             {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"sources[0] {sources[0]} matches instance.gameObject.name {source.gameObject.name}");
                                 replaceClip = true;
+                            }
+                            else
+                            {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"sources[0] {sources[0]} does not match instance.gameObject.name {source.gameObject.name}");
                             }
                         }
                     }
                 }
+                else
+                {
+                    if (SoundTool.infoDebugging)
+                        SoundTool.Instance.logger.LogDebug($"replacedClips[finalName].source was empty or null '{SoundTool.replacedClips[finalName].source}'");
+                }
+
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replaceClip {replaceClip}");
 
                 List<RandomAudioClip> randomAudioClip = SoundTool.replacedClips[finalName].clips;
 
@@ -400,6 +513,9 @@ namespace LCSoundTool.Patches
                 {
                     totalChance += rc.chance;
                 }
+
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"totalChance {totalChance}");
 
                 // Generate a random value between 0 and totalChance
                 float randomValue = UnityEngine.Random.Range(0f, totalChance);
@@ -412,12 +528,18 @@ namespace LCSoundTool.Patches
                         // Return the chosen audio clip if allowed, otherwise revert it to vanilla and return the vanilla sound instead.
                         if (replaceClip)
                         {
+                            if (SoundTool.infoDebugging)
+                                SoundTool.Instance.logger.LogDebug($"clip replaced with {rc.clip}");
                             return rc.clip;
                         }
                         else
                         {
+                            if (SoundTool.infoDebugging)
+                                SoundTool.Instance.logger.LogDebug($"clip was not replaced with {rc.clip}");
                             if (originalClips.ContainsKey(finalName))
                             {
+                                if (SoundTool.infoDebugging)
+                                    SoundTool.Instance.logger.LogDebug($"originalClips.ContainsKey(finalName), clip was restored to {originalClips[finalName]}");
                                 AudioClip temp = originalClips[finalName];
                                 originalClips.Remove(finalName);
                                 return temp;
@@ -433,8 +555,12 @@ namespace LCSoundTool.Patches
             // If clipName doesn't exist in the dictionary, check if it exists in the original clips if so use that and remove it
             else if (originalClips.ContainsKey(finalName))
             {
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"replacedClips did not contain finalName but originalClips contained finalName");
                 AudioClip temp = originalClips[finalName];
                 originalClips.Remove(finalName);
+                if (SoundTool.infoDebugging)
+                    SoundTool.Instance.logger.LogDebug($"clip was restored to {originalClips[finalName]}");
                 return temp;
             }
 

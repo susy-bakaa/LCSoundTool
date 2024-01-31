@@ -4,12 +4,7 @@ using UnityEngine.Networking;
 
 namespace LCSoundTool.Utilities
 {
-    // Currently this class is identical to WavUtility besides the last method and surprisingly it seems to function fine?
-    // In theory this byte conversion stuff should be only compatible with WAV audio or specifically PCM type audio.
-    // Maybe Unity internally stores MDCT audio loaded with UWR as PCM and thats why it works or something. No idea. >O<
-    // But it does work. I decided to leave it in it's own seperate duplicate class however.
-    // Mostly in case I WOULD need to give it it's own functionality later or maybe it doesn't work in all cases or something similar.
-    public static class OggUtility
+    public static class AudioUtility
     {
         public static byte[] AudioClipToByteArray(AudioClip audioClip, out float[] samples)
         {
@@ -28,12 +23,36 @@ namespace LCSoundTool.Utilities
             return byteArray;
         }
 
-        public static AudioClip ByteArrayToAudioClip(byte[] byteArray, string clipName)
+        /// <summary>
+        /// Function that let's you load WAV files directly from memory as byte arrays into Unity AudioClips.
+        /// </summary>
+        /// <param name="fileData">The WAV file in memory, represented as a byte array.</param>
+        /// <param name="clipName">The name this AudioClip will be given once loaded and created.</param>
+        /// <returns></returns>
+        public static AudioClip LoadFromMemory(byte[] fileData, string clipName)
         {
+            // Extract relevant information from the WAV file header
+            int channels = BitConverter.ToInt16(fileData, 22);
+            int frequency = BitConverter.ToInt32(fileData, 24);
+            int bitsPerSample = BitConverter.ToInt16(fileData, 34);
+            // Remove the WAV header to get only the audio data
+            byte[] audioData = new byte[fileData.Length - 44];
+            System.Array.Copy(fileData, 44, audioData, 0, audioData.Length);
+
+            return ByteArrayToAudioClip(audioData, clipName, channels, frequency);
+        }
+
+        public static AudioClip ByteArrayToAudioClip(byte[] byteArray, string clipName, int channels, int frequency)
+        {
+            if (frequency < 1 || frequency > 48000)
+                frequency = 44100;
+            if (channels < 1 || channels > 2)
+                channels = 1;
+
             int bitsPerSample = 16;
             int bytesPerSample = bitsPerSample / 8;
 
-            AudioClip audioClip = AudioClip.Create(clipName, byteArray.Length / bytesPerSample, 1, 44100, false);
+            AudioClip audioClip = AudioClip.Create(clipName, byteArray.Length / bytesPerSample, channels, frequency, false);
 
             audioClip.SetData(ConvertByteArrayToFloatArray(byteArray), 0);
 
@@ -54,10 +73,10 @@ namespace LCSoundTool.Utilities
             return floatArray;
         }
 
-        public static AudioClip LoadFromDiskToAudioClip(string path)
+        public static AudioClip LoadFromDiskToAudioClip(string path, AudioType type)
         {
             AudioClip clip = null;
-            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, AudioType.OGGVORBIS))
+            using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(path, type))
             {
                 uwr.SendWebRequest();
 
@@ -70,7 +89,7 @@ namespace LCSoundTool.Utilities
                     }
 
                     if (uwr.result != UnityWebRequest.Result.Success)
-                        SoundTool.Instance.logger.LogError($"Failed to load OGGVORBIS AudioClip from path: {path} Full error: {uwr.error}");
+                        SoundTool.Instance.logger.LogError($"Failed to load WAV AudioClip from path: {path} Full error: {uwr.error}");
                     else
                     {
                         clip = DownloadHandlerAudioClip.GetContent(uwr);
